@@ -333,6 +333,60 @@ describe("disposable PostgreSQL foundation", () => {
       const evidence = evidenceRes.json();
       expect(evidence.finalStatus).toBe("answered");
 
+      const csvRes = await app.inject({
+        method: "GET",
+        url: `/v1/runs/${run.runId}/export/csv`,
+        headers: authHeaders,
+      });
+      expect(csvRes.statusCode).toBe(200);
+      expect(csvRes.body).toContain("school_id,delta");
+      expect(csvRes.body).toContain("1,-20");
+      expect(csvRes.body).toContain("4,-10");
+
+      const sqlRes = await app.inject({
+        method: "GET",
+        url: `/v1/runs/${run.runId}/export/sql`,
+        headers: authHeaders,
+      });
+      expect(sqlRes.statusCode).toBe(200);
+      expect(sqlRes.body).toContain("-- Metis Analytical SQL Export");
+      expect(sqlRes.body).toContain("analytics_clean.enrolments");
+
+      const bundleRes = await app.inject({
+        method: "GET",
+        url: `/v1/runs/${run.runId}/export/reproducibility`,
+        headers: authHeaders,
+      });
+      expect(bundleRes.statusCode).toBe(200);
+      const bundle = bundleRes.json();
+      expect(bundle.version).toBe("1.0.0");
+      expect(bundle.answer.status).toBe("answered");
+
+      const ledgerRes = await app.inject({
+        method: "GET",
+        url: `/v1/runs/${run.runId}/ledger`,
+        headers: authHeaders,
+      });
+      expect(ledgerRes.statusCode).toBe(200);
+      const ledger = ledgerRes.json();
+      expect(ledger.status).toBe("answered");
+      expect(ledger.claims[0].supportingRows).toEqual([
+        { school_id: 1, delta: -20 },
+        { school_id: 4, delta: -10 },
+      ]);
+
+      const revokeRes = await app.inject({
+        method: "DELETE",
+        url: `/v1/connections/${connId}`,
+        headers: authHeaders,
+      });
+      expect(revokeRes.statusCode).toBe(200);
+      expect(revokeRes.json().status).toBe("revoked");
+
+      const connInDb =
+        await client`SELECT status FROM connections WHERE id = ${connId}`;
+      expect(connInDb[0]?.status).toBe("revoked");
+
       const runsInDb =
         await client`SELECT count(*)::int AS cnt FROM analysis_runs WHERE id = ${run.runId}`;
       expect(runsInDb[0]?.cnt).toBe(1);

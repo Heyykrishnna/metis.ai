@@ -310,3 +310,72 @@ export type QuestionIntent = Static<typeof QuestionIntentSchema>;
 export type AnalyticalPlan = Static<typeof AnalyticalPlanSchema>;
 export type AnswerEnvelope = Static<typeof AnswerEnvelopeSchema>;
 export type RunStatus = Static<typeof RunStatusSchema>;
+
+export const TruthLedgerRuleCheckSchema = Type.Object(
+  {
+    ruleId: TextSchema,
+    outcome: TextSchema,
+    reason: TextSchema,
+  },
+  { additionalProperties: false },
+);
+
+export const TruthLedgerClaimSchema = Type.Object(
+  {
+    claim: TextSchema,
+    supportingRows: Type.Array(Type.Record(Type.String(), ScalarSchema), {
+      maxItems: foundationPolicy.limits.resultRows,
+    }),
+    sqlReference: Type.Union([IdSchema, Type.Null()]),
+    sourceObjects: Type.Array(TextSchema, { maxItems: 100 }),
+    verificationRules: Type.Array(TruthLedgerRuleCheckSchema, {
+      maxItems: 100,
+    }),
+  },
+  { additionalProperties: false },
+);
+
+export const TruthLedgerSchema = Type.Object(
+  {
+    runId: IdSchema,
+    status: TerminalStatusSchema,
+    claims: Type.Array(TruthLedgerClaimSchema, { maxItems: 100 }),
+    coverage: Type.Object(
+      {
+        included: Type.Integer({ minimum: 0 }),
+        excluded: Type.Integer({ minimum: 0 }),
+        denominator: Type.Integer({ minimum: 0 }),
+      },
+      { additionalProperties: false },
+    ),
+    exclusions: Type.Array(TextSchema, { maxItems: 100 }),
+    limitations: Type.Array(TextSchema, { maxItems: 100 }),
+  },
+  { additionalProperties: false },
+);
+
+export const ReproducibilityBundleSchema = Type.Object(
+  {
+    version: Type.Literal("1.0.0"),
+    runId: IdSchema,
+    workspaceId: IdSchema,
+    connectionId: IdSchema,
+    parentRunId: Type.Union([IdSchema, Type.Null()]),
+    question: TextSchema,
+    intent: Type.Union([QuestionIntentSchema, Type.Null()]),
+    snapshotId: Type.Union([IdSchema, Type.Null()]),
+    plan: Type.Union([AnalyticalPlanSchema, Type.Null()]),
+    candidate: Type.Union([SqlCandidateSchema, Type.Null()]),
+    execution: Type.Union([ExecutionRecordSchema, Type.Null()]),
+    verification: Type.Union([VerificationReportSchema, Type.Null()]),
+    answer: AnswerEnvelopeSchema,
+    assumptions: Type.Array(TextSchema, { maxItems: 50 }),
+    exclusions: Type.Array(TextSchema, { maxItems: 100 }),
+    modelVersion: TextSchema,
+    exportedAt: TimestampSchema,
+  },
+  { additionalProperties: false },
+);
+
+export type TruthLedger = Static<typeof TruthLedgerSchema>;
+export type ReproducibilityBundle = Static<typeof ReproducibilityBundleSchema>;

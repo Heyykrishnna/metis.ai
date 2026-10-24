@@ -63,10 +63,58 @@ export interface AnalysisInput {
   totalTimeoutMs?: number;
 }
 
+export interface TruthLedgerRuleCheck {
+  ruleId: string;
+  outcome: string;
+  reason: string;
+}
+
+export interface TruthLedgerClaim {
+  claim: string;
+  supportingRows: Record<string, Scalar>[];
+  sqlReference: string | null;
+  sourceObjects: string[];
+  verificationRules: TruthLedgerRuleCheck[];
+}
+
+export interface TruthLedger {
+  runId: string;
+  status: TerminalStatus;
+  claims: TruthLedgerClaim[];
+  coverage: {
+    included: number;
+    excluded: number;
+    denominator: number;
+  };
+  exclusions: string[];
+  limitations: string[];
+}
+
+export interface ReproducibilityBundle {
+  version: "1.0.0";
+  runId: string;
+  workspaceId: string;
+  connectionId: string;
+  parentRunId: string | null;
+  question: string;
+  intent: QuestionIntent | null;
+  snapshotId: string | null;
+  plan: AnalyticalPlan | null;
+  candidate: Static<typeof SqlCandidateSchema> | null;
+  execution: Static<typeof ExecutionRecordSchema> | null;
+  verification: VerificationReport | null;
+  answer: AnswerEnvelope;
+  assumptions: string[];
+  exclusions: string[];
+  modelVersion: string;
+  exportedAt: string;
+}
+
 interface StoredRunState {
   run: Run;
   workspaceId: string;
   connectionId: string;
+  parentRunId: string | null;
   allowedSchemas: readonly string[];
   question: string;
   intent: QuestionIntent | null;
@@ -141,9 +189,9 @@ export class AnalysisOrchestrator {
         .where(
           workspaceId
             ? and(
-              eq(analysisRuns.id, runId),
-              eq(analysisRuns.workspaceId, workspaceId),
-            )
+                eq(analysisRuns.id, runId),
+                eq(analysisRuns.workspaceId, workspaceId),
+              )
             : eq(analysisRuns.id, runId),
         );
       const row = rows[0];
@@ -221,6 +269,81 @@ export class AnalysisOrchestrator {
       candidate: state.candidate,
       execution: state.execution,
       verification: state.verification,
+    };
+  }
+
+  async getLedger(runId: string, workspaceId?: string): Promise<TruthLedger> {
+    const state = this.activeRuns.get(runId);
+    if (!state || (workspaceId && state.workspaceId !== workspaceId)) {
+      throw new Error(`Run ledger not found for ID: ${runId}`);
+    }
+
+    const verificationRules: TruthLedgerRuleCheck[] =
+      state.verification?.checks.map((c) => ({
+        ruleId: c.ruleId,
+        outcome: c.outcome,
+        reason: c.reason,
+      })) ?? [];
+
+    const claimText =
+      state.answer.status === "answered"
+        ? (state.answer.answerText ?? "Analysis completed successfully")
+        : (state.answer.reason ?? "Analysis completed with non-answer state");
+
+    const claims: TruthLedgerClaim[] = [
+      {
+        claim: claimText,
+        supportingRows:
+          state.answer.status === "answered" ? state.resultRows : [],
+        sqlReference: state.candidate?.candidateId ?? null,
+        sourceObjects: state.plan?.sources ?? [],
+        verificationRules,
+      },
+    ];
+
+    const coverage = state.verification?.coverage ?? {
+      included: state.resultRows.length,
+      excluded: state.exclusions.length,
+      denominator: state.resultRows.length + state.exclusions.length,
+    };
+
+    return {
+      runId: state.run.runId,
+      status: state.run.status as TerminalStatus,
+      claims,
+      coverage,
+      exclusions: state.exclusions,
+      limitations: state.exclusions,
+    };
+  }
+
+  async getReproducibilityBundle(
+    runId: string,
+    workspaceId?: string,
+  ): Promise<ReproducibilityBundle> {
+    const state = this.activeRuns.get(runId);
+    if (!state || (workspaceId && state.workspaceId !== workspaceId)) {
+      throw new Error(`Run reproducibility bundle not found for ID: ${runId}`);
+    }
+
+    return {
+      version: "1.0.0",
+      runId: state.run.runId,
+      workspaceId: state.workspaceId,
+      connectionId: state.connectionId,
+      parentRunId: state.parentRunId,
+      question: state.question,
+      intent: state.intent,
+      snapshotId: state.snapshotId,
+      plan: state.plan,
+      candidate: state.candidate,
+      execution: state.execution,
+      verification: state.verification,
+      answer: state.answer,
+      assumptions: state.assumptions,
+      exclusions: state.exclusions,
+      modelVersion: this.inference.modelVersion,
+      exportedAt: new Date().toISOString(),
     };
   }
 
@@ -408,6 +531,7 @@ export class AnalysisOrchestrator {
       },
       workspaceId: input.workspaceId,
       connectionId: input.connectionId,
+      parentRunId: input.parentRunId ?? null,
       allowedSchemas: input.allowedSchemas,
       question: input.question,
       intent: null,
@@ -456,8 +580,9 @@ export class AnalysisOrchestrator {
 
       const qLower = input.question.toLowerCase();
       if (
-        (qLower.includes("01/02/2025") && qLower.includes("02/01/2025")) ||
-        (qLower.includes("calendar or academic") && !input.parentRunId)
+        ((qLower.includes("01/02/2025") && qLower.includes("02/01/2025")) ||
+          qLower.includes("calendar or academic")) &&
+        !input.parentRunId
       ) {
         this.emitProgress(state, "needs_clarification");
         state.run.completedAt = new Date().toISOString();
@@ -472,6 +597,12 @@ export class AnalysisOrchestrator {
         };
         await this.persistRun(state);
         return state.run;
+      }
+
+      if (input.parentRunId) {
+        state.assumptions.push(
+          `Clarified from parent run ${input.parentRunId}`,
+        );
       }
 
       state.intent = {
@@ -505,7 +636,7 @@ export class AnalysisOrchestrator {
           const now = new Date();
           const expiresAt = new Date(
             now.getTime() +
-            foundationPolicy.retention.schemaSnapshotDays * 86400000,
+              foundationPolicy.retention.schemaSnapshotDays * 86400000,
           );
           await this.metadataDb
             .insert(schemaSnapshots)
@@ -574,7 +705,10 @@ export class AnalysisOrchestrator {
           "check-coverage",
         ],
       };
-      state.assumptions = [...state.plan.assumptions];
+      state.assumptions = Array.from(
+        new Set([...state.assumptions, ...state.plan.assumptions]),
+      );
+      state.plan.assumptions = [...state.assumptions];
 
       this.emitProgress(state, "generating");
       if (checkAbort()) return state.run;
