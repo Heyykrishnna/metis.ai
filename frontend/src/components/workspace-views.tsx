@@ -59,7 +59,7 @@ export function DocumentPreview({ document }: { document: LocalDocument }) {
             ? `${document.rowCount.toLocaleString()} rows · ${document.columns.length} columns`
             : "Text document"}
         </span>
-        <span className="badge">Browser only</span>
+        <span className="badge">Neon · Brotli</span>
       </div>
       {document.columns.length ? (
         <>
@@ -127,7 +127,7 @@ export function FileList({
               {document.columns.length
                 ? `${document.rowCount.toLocaleString()} rows`
                 : "Text document"}{" "}
-              · In this session
+              · Stored in Neon
             </span>
           </button>
           <span className="file-state">

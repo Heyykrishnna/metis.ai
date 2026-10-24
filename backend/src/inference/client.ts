@@ -66,7 +66,10 @@ export class OllamaInferenceClient implements InferenceClient {
       options?.baseUrl ??
       process.env.INFERENCE_BASE_URL ??
       "http://127.0.0.1:11434";
-    this.modelVersion = options?.model ?? "qwen2.5-coder:7b-instruct-q4_K_M";
+    this.modelVersion =
+      options?.model ??
+      process.env.INFERENCE_MODEL ??
+      "qwen2.5-coder:7b-instruct-q4_K_M";
     this.temperature = options?.temperature ?? 0;
     this.fetcher = options?.fetcher ?? fetch;
   }
@@ -106,7 +109,7 @@ export class OllamaInferenceClient implements InferenceClient {
         model: this.modelVersion,
         prompt,
         stream: false,
-        format: "json",
+        format: schema,
         options: {
           temperature: this.temperature,
           num_ctx: 8192,

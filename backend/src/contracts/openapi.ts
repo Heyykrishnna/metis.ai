@@ -52,7 +52,20 @@ import {
   RecipePublishInputSchema,
 } from "./governance.js";
 
+import {
+  FileAnalysisSchema,
+  FilePreviewSchema,
+  FileQuestionSchema,
+  FileUploadSchema,
+  StoredFileSchema,
+} from "./files.js";
+
 const apiSchemas = {
+  StoredFile: StoredFileSchema,
+  FileUpload: FileUploadSchema,
+  FilePreview: FilePreviewSchema,
+  FileQuestion: FileQuestionSchema,
+  FileAnalysis: FileAnalysisSchema,
   QuestionIntent: QuestionIntentSchema,
   SchemaEvidence: SchemaEvidenceSchema,
   AnalyticalPlan: AnalyticalPlanSchema,
@@ -118,7 +131,7 @@ function operation(
 ) {
   return {
     operationId,
-    "x-implementation-status": "planned",
+    "x-implementation-status": "implemented",
     security: [{ bearerAuth: [] }],
     ...(body === undefined
       ? {}
@@ -149,9 +162,68 @@ export const openApiDocument = {
     title: "metis.ai API",
     version: "0.1.0",
     description:
-      "Phase 0 contracts. Only /health is implemented. Operations labelled planned are specifications, not available product routes.",
+      "Local workspace API. Stored-file analysis uses Neon persistence, Brotli compression and bounded local inference. External SQL analysis requires a configured read-only analytical adapter.",
   },
   paths: {
+    "/v1/capabilities": {
+      get: operation(
+        "getCapabilities",
+        Type.Object(
+          {
+            storageAvailable: Type.Boolean(),
+            analysisAvailable: Type.Boolean(),
+            inferenceAvailable: Type.Boolean(),
+            model: Type.String(),
+          },
+          { additionalProperties: false },
+        ),
+      ),
+    },
+    "/v1/files": {
+      get: operation("listFiles", Type.Array(ref("StoredFile"))),
+      post: operation(
+        "uploadFile",
+        ref("FilePreview"),
+        ref("FileUpload"),
+        "201",
+      ),
+    },
+    "/v1/files/{fileId}": {
+      parameters: [
+        { name: "fileId", in: "path", required: true, schema: IdSchema },
+      ],
+      get: operation("previewFile", ref("FilePreview")),
+      delete: operation("deleteFile", Type.Object({ deleted: Type.Boolean() })),
+    },
+    "/v1/files/{fileId}/content": {
+      parameters: [
+        { name: "fileId", in: "path", required: true, schema: IdSchema },
+      ],
+      get: {
+        ...operation("downloadFile", Type.String()),
+        responses: {
+          ...operation("downloadFile", Type.String()).responses,
+          "200": {
+            description:
+              "Original file bytes, verified after Brotli decompression",
+            content: {
+              "application/octet-stream": {
+                schema: { type: "string", format: "binary" },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/v1/files/{fileId}/analyses": {
+      parameters: [
+        { name: "fileId", in: "path", required: true, schema: IdSchema },
+      ],
+      post: operation("analyzeFile", ref("FileAnalysis"), ref("FileQuestion")),
+    },
+    "/v1/file-analyses": {
+      get: operation("listFileAnalyses", Type.Array(ref("FileAnalysis"))),
+    },
     "/health": {
       get: {
         operationId: "getHealth",
@@ -268,7 +340,7 @@ export const openApiDocument = {
       parameters: runParameters,
       get: {
         operationId: "exportRunCsv",
-        "x-implementation-status": "planned",
+        "x-implementation-status": "implemented",
         security: [{ bearerAuth: [] }],
         responses: {
           "200": {
@@ -285,7 +357,7 @@ export const openApiDocument = {
       parameters: runParameters,
       get: {
         operationId: "exportRunSql",
-        "x-implementation-status": "planned",
+        "x-implementation-status": "implemented",
         security: [{ bearerAuth: [] }],
         responses: {
           "200": {
@@ -370,7 +442,7 @@ export const openApiDocument = {
     "/v1/audit/export": {
       get: {
         operationId: "exportAuditEvents",
-        "x-implementation-status": "planned",
+        "x-implementation-status": "implemented",
         security: [{ bearerAuth: [] }],
         responses: {
           "200": {

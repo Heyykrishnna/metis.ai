@@ -1,0 +1,13 @@
+{
+  "name": "metis-workspace",
+  "private": true,
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "setup": "npm --prefix backend ci && npm --prefix frontend ci && node scripts/configure-local.mjs && npm --prefix backend run db:migrate",
+    "test:web:live": "node scripts/check-web-flow.mjs",
+    "dev": "node scripts/dev.mjs",
+    "check": "npm --prefix backend run check && npm --prefix frontend run check"
+  }
+}

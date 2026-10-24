@@ -17,6 +17,8 @@ export type Question = {
   runId?: string;
   status?: string;
   connectionId?: string;
+  fileId?: string;
+  fileAnalysis?: import("./file-client").FileAnalysis;
   result?: Result;
   evidence?: EvidenceBundle;
   ledger?: TruthLedger;
@@ -105,6 +107,38 @@ export function readQuestions(serialized: string): Question[] {
   } catch {
     return [];
   }
+}
+
+export function serializeQuestions(questions: Question[]): string {
+  return JSON.stringify(
+    questions
+      .slice(0, 100)
+      .map(
+        ({
+          id,
+          text,
+          mode,
+          source,
+          createdAt,
+          saved,
+          runId,
+          status,
+          connectionId,
+          fileId,
+        }) => ({
+          id,
+          text,
+          mode,
+          source,
+          createdAt,
+          saved,
+          runId,
+          status,
+          connectionId,
+          fileId,
+        }),
+      ),
+  );
 }
 
 export function downloadText(filename: string, text: string) {

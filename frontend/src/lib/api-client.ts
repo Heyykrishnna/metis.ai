@@ -67,6 +67,8 @@ async function fetchJson<T>(
   const response = await fetch(url, {
     ...options,
     headers,
+    signal: options?.signal ?? AbortSignal.timeout(90000),
+    cache: "no-store",
   });
 
   if (!response.ok) {

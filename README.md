@@ -52,43 +52,32 @@ Inference runs as a separate service using a compliant open-weight model of at m
 
 ## Getting started
 
-Requires Node.js 24 or later and npm. Install reproducibly from the repository root:
+Requires Node.js 24 or later, npm and Ollama. The existing ignored `backend/.env` supplies Neon configuration; no additional database connection is needed for uploaded-file questions.
 
 ```bash
-npm --prefix backend ci
-npm --prefix frontend ci
-node scripts/skills.mjs --link
+npm run setup
+npm run dev
 ```
 
-Use [the foundation setup guide](docs/engineering/foundation.md) to generate local environment files, start isolated databases, apply migrations, and initialize synthetic fixtures. Preserve any existing environment files.
+Setup installs the locked dependencies, synchronizes a server-only local workspace credential and applies additive database migrations. Development startup verifies the Neon schema, reuses the configured API when healthy, starts Ollama when needed and runs the frontend. The default addresses are `http://127.0.0.1:3005` for the workspace and `http://127.0.0.1:3001` for the API. Use `WEB_PORT` and `API_PORT` to choose other ports.
 
-Run the applications in separate terminals:
+The configured local Qwen model must be installed in Ollama; see [inference configuration](inference/README.md). On this machine it has been installed and tested. See [the integration guide](docs/engineering/integration.md) for the supported workflow, limits and verification commands.
 
-```bash
-npm --prefix backend run dev
-npm --prefix frontend run dev
-```
+## Working file workflow
 
-The API listens on `http://127.0.0.1:3001`; the web app listens on `http://localhost:3000`.
+Upload CSV, JSON, TXT or Markdown, select it as the source and ask a question. Files persist in Neon as Brotli-compressed original bytes with SHA-256 integrity checks. Table questions use validated plans and server-side calculations over all validated records. Answers, evidence and history survive refresh. Unsupported or ambiguous questions receive a clarification or abstention. External SQL analysis requires a separately configured read-only analytical adapter; the metadata owner connection is never reused for arbitrary analytical queries.
 
-## Status
-
-This repository is the foundation for metis.ai. The product is specified; the first delivery target is a single reliable vertical slice: connect a database, inspect schema, ask a question, execute safe SQL, and return an evidence-backed answer or a clear refusal.
-
-## Foundation workflow
-
-Phase 0 adds reproducible checks, contract generation, versioned metadata migrations, synthetic PostgreSQL fixtures, and a pinned local inference configuration. Product analysis endpoints remain planned.
-
-Follow [the foundation guide](docs/engineering/foundation.md) for environment generation, isolated databases, skill synchronization, contracts, checks, and recovery. See [validation evidence](docs/engineering/foundation-validation.md) for actual outcomes and limits, and [local inference configuration](inference/README.md) for the model boundary.
+## Validation
 
 ```bash
-npm --prefix backend run check
-npm --prefix frontend run check
-node scripts/skills.mjs --link
-node scripts/check-foundation.mjs
+npm run check
 node scripts/test-database.mjs
-node scripts/smoke.mjs
+npm --prefix backend run test:files:live
 ```
+
+`check` runs lint, formatting, TypeScript, behavior tests, contract consistency and production builds for both applications. The database runner uses a disposable local PostgreSQL database and tests backup/restore. The live file check creates a synthetic file in the configured Neon database, verifies exact download, model-planned calculations and restart persistence, then deletes its own file. It requires the configured local model to be running.
+
+Earlier phase reports describe their scoped fixtures and evaluations; they are not a guarantee that arbitrary questions can be answered. [The foundation guide](docs/engineering/foundation.md) retains isolated fixture setup and recovery procedures.
 
 The local delivery plan remains in the Git-ignored `project-phases/` folder. Canonical skills under `.agents/skills` are tracked; `skills/` contains ignored aliases. Do not use fixture administrator credentials for analytical queries.
 

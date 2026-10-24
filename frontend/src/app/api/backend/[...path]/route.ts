@@ -1,64 +1,79 @@
 import type { NextRequest } from "next/server";
 
-const DEFAULT_WORKSPACE_AUTH =
-  "Bearer analyst-a:00000000-0000-4000-8000-000000000001";
-
 async function proxy(request: NextRequest, params: { path: string[] }) {
   const backendBase = process.env.METIS_API_URL ?? "http://127.0.0.1:3001";
-  const subpath = params.path.join("/");
-  const url = new URL(`/${subpath}`, backendBase);
-  url.search = request.nextUrl.search;
-
-  const headers = new Headers();
-  headers.set(
-    "Authorization",
-    request.headers.get("Authorization") ?? DEFAULT_WORKSPACE_AUTH,
+  if (
+    params.path.some(
+      (part) =>
+        part === "." ||
+        part === ".." ||
+        part.includes("/") ||
+        part.includes("\\"),
+    )
+  )
+    return Response.json({ message: "Invalid service path." }, { status: 400 });
+  const url = new URL(
+    `/${params.path.map(encodeURIComponent).join("/")}`,
+    backendBase,
   );
-  if (request.headers.get("Content-Type")) {
-    headers.set("Content-Type", request.headers.get("Content-Type") as string);
-  }
-  if (request.headers.get("Accept")) {
-    headers.set("Accept", request.headers.get("Accept") as string);
-  }
-
-  let body: BodyInit | null = null;
-  if (request.method !== "GET" && request.method !== "HEAD") {
-    body = await request.text();
-  }
-
+  url.search = request.nextUrl.search;
+  const authorization =
+    request.headers.get("Authorization") ??
+    (process.env.METIS_BACKEND_TOKEN
+      ? `Bearer ${process.env.METIS_BACKEND_TOKEN}`
+      : null);
+  if (!authorization)
+    return Response.json(
+      {
+        message:
+          "The local workspace credential is not configured. Run the local setup command.",
+      },
+      { status: 401 },
+    );
+  const headers = new Headers({ Authorization: authorization });
+  const contentType = request.headers.get("Content-Type");
+  if (contentType) headers.set("Content-Type", contentType);
+  headers.set("Accept", request.headers.get("Accept") ?? "application/json");
+  const length = request.headers.get("Content-Length");
+  if (length && Number(length) > 8 * 1024 * 1024)
+    return Response.json(
+      { message: "The upload exceeds the supported size." },
+      { status: 413 },
+    );
   try {
-    const upstreamResponse = await fetch(url.toString(), {
+    const payload =
+      request.method !== "GET" && request.method !== "HEAD"
+        ? await request.arrayBuffer()
+        : null;
+    if (payload && payload.byteLength > 8 * 1024 * 1024)
+      return Response.json(
+        { message: "The upload exceeds the supported size." },
+        { status: 413 },
+      );
+    const body = payload?.byteLength ? payload : null;
+    if (!body) headers.delete("Content-Type");
+    const upstream = await fetch(url, {
       method: request.method,
       headers,
       body,
-      signal: AbortSignal.timeout(15000),
+      cache: "no-store",
+      signal: AbortSignal.any([request.signal, AbortSignal.timeout(90000)]),
     });
-
-    const responseHeaders = new Headers();
-    const contentType = upstreamResponse.headers.get("Content-Type");
-    if (contentType) {
-      responseHeaders.set("Content-Type", contentType);
+    const responseHeaders = new Headers({ "Cache-Control": "no-store" });
+    for (const header of ["Content-Type", "Content-Disposition"]) {
+      const value = upstream.headers.get(header);
+      if (value) responseHeaders.set(header, value);
     }
-    const contentDisposition = upstreamResponse.headers.get(
-      "Content-Disposition",
-    );
-    if (contentDisposition) {
-      responseHeaders.set("Content-Disposition", contentDisposition);
-    }
-
-    const responseBody = await upstreamResponse.arrayBuffer();
-    return new Response(responseBody, {
-      status: upstreamResponse.status,
+    return new Response(upstream.status === 204 ? null : upstream.body, {
+      status: upstream.status,
       headers: responseHeaders,
     });
-  } catch (error) {
+  } catch {
     return Response.json(
       {
         code: "dependency_unavailable",
         message:
-          error instanceof Error
-            ? error.message
-            : "Backend analytical service is unreachable",
+          "The backend is unavailable or the request timed out. Check the local services and retry.",
       },
       { status: 503 },
     );
@@ -69,22 +84,17 @@ export async function GET(
   request: NextRequest,
   props: { params: Promise<{ path: string[] }> },
 ) {
-  const params = await props.params;
-  return proxy(request, params);
+  return proxy(request, await props.params);
 }
-
 export async function POST(
   request: NextRequest,
   props: { params: Promise<{ path: string[] }> },
 ) {
-  const params = await props.params;
-  return proxy(request, params);
+  return proxy(request, await props.params);
 }
-
 export async function DELETE(
   request: NextRequest,
   props: { params: Promise<{ path: string[] }> },
 ) {
-  const params = await props.params;
-  return proxy(request, params);
+  return proxy(request, await props.params);
 }

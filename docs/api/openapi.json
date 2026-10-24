@@ -3,9 +3,758 @@
   "info": {
     "title": "metis.ai API",
     "version": "0.1.0",
-    "description": "Phase 0 contracts. Only /health is implemented. Operations labelled planned are specifications, not available product routes."
+    "description": "Local workspace API. Stored-file analysis uses Neon persistence, Brotli compression and bounded local inference. External SQL analysis requires a configured read-only analytical adapter."
   },
   "paths": {
+    "/v1/capabilities": {
+      "get": {
+        "operationId": "getCapabilities",
+        "x-implementation-status": "implemented",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "storageAvailable",
+                    "analysisAvailable",
+                    "inferenceAvailable",
+                    "model"
+                  ],
+                  "properties": {
+                    "storageAvailable": {
+                      "type": "boolean"
+                    },
+                    "analysisAvailable": {
+                      "type": "boolean"
+                    },
+                    "inferenceAvailable": {
+                      "type": "boolean"
+                    },
+                    "model": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Resource limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/files": {
+      "get": {
+        "operationId": "listFiles",
+        "x-implementation-status": "implemented",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/StoredFile"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Resource limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "uploadFile",
+        "x-implementation-status": "implemented",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FileUpload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FilePreview"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Resource limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/files/{fileId}": {
+      "parameters": [
+        {
+          "name": "fileId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "previewFile",
+        "x-implementation-status": "implemented",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FilePreview"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Resource limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteFile",
+        "x-implementation-status": "implemented",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "deleted"
+                  ],
+                  "properties": {
+                    "deleted": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Resource limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/files/{fileId}/content": {
+      "parameters": [
+        {
+          "name": "fileId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "downloadFile",
+        "x-implementation-status": "implemented",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Original file bytes, verified after Brotli decompression",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Resource limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/files/{fileId}/analyses": {
+      "parameters": [
+        {
+          "name": "fileId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          }
+        }
+      ],
+      "post": {
+        "operationId": "analyzeFile",
+        "x-implementation-status": "implemented",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FileQuestion"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileAnalysis"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Resource limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/file-analyses": {
+      "get": {
+        "operationId": "listFileAnalyses",
+        "x-implementation-status": "implemented",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FileAnalysis"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Resource limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/health": {
       "get": {
         "operationId": "getHealth",
@@ -28,7 +777,7 @@
     "/v1/connections/test": {
       "post": {
         "operationId": "testConnection",
-        "x-implementation-status": "planned",
+        "x-implementation-status": "implemented",
         "security": [
           {
             "bearerAuth": []
@@ -121,7 +870,7 @@
     "/v1/connections": {
       "post": {
         "operationId": "createConnection",
-        "x-implementation-status": "planned",
+        "x-implementation-status": "implemented",
         "security": [
           {
             "bearerAuth": []
@@ -212,7 +961,7 @@
       },
       "get": {
         "operationId": "listConnections",
-        "x-implementation-status": "planned",
+        "x-implementation-status": "implemented",
         "security": [
           {
             "bearerAuth": []
@@ -306,7 +1055,7 @@
       ],
       "get": {
         "operationId": "getConnection",
-        "x-implementation-status": "planned",
+        "x-implementation-status": "implemented",
         "security": [
           {
             "bearerAuth": []
@@ -387,7 +1136,7 @@
       },
       "delete": {
         "operationId": "revokeConnection",
-        "x-implementation-status": "planned",
+        "x-implementation-status": "implemented",
         "security": [
           {
             "bearerAuth": []
@@ -481,7 +1230,7 @@
       ],
       "get": {
         "operationId": "getSchemaConstellation",
-        "x-implementation-status": "planned",
+        "x-implementation-status": "implemented",
         "security": [
           {
             "bearerAuth": []
@@ -575,7 +1324,7 @@
       ],
       "get": {
         "operationId": "getConnectionDrift",
-        "x-implementation-status": "planned",
+        "x-implementation-status": "implemented",
         "security": [
           {
             "bearerAuth": []
@@ -669,7 +1418,7 @@
       ],
       "get": {
         "operationId": "getImpactPreview",
-        "x-implementation-status": "planned",
+        "x-implementation-status": "implemented",
         "security": [
           {
             "bearerAuth": []
@@ -763,7 +1512,7 @@
       ],
       "get": {
         "operationId": "listConnectionMappings",
-        "x-implementation-status": "planned",
+        "x-implementation-status": "implemented",
         "security": [
           {
             "bearerAuth": []
@@ -844,7 +1593,7 @@
       },
       "post": {
         "operationId": "createSchemaMapping",
-        "x-implementation-status": "planned",
+        "x-implementation-status": "implemented",
         "security": [
           {
             "bearerAuth": []
@@ -957,7 +1706,7 @@
       ],
       "post": {
         "operationId": "approveSchemaMapping",
-        "x-implementation-status": "planned",
+        "x-implementation-status": "implemented",
         "security": [
           {
             "bearerAuth": []
@@ -1040,7 +1789,7 @@
     "/v1/analyses": {
       "post": {
         "operationId": "submitAnalysis",
-        "x-implementation-status": "planned",
+        "x-implementation-status": "implemented",
         "security": [
           {
             "bearerAuth": []
@@ -1144,7 +1893,7 @@
       ],
       "get": {
         "operationId": "getRun",
-        "x-implementation-status": "planned",
+        "x-implementation-status": "implemented",
         "security": [
           {
             "bearerAuth": []
@@ -1238,7 +1987,7 @@
       ],
       "get": {
         "operationId": "getRunEvents",
-        "x-implementation-status": "planned",
+        "x-implementation-status": "implemented",
         "security": [
           {
             "bearerAuth": []
@@ -1302,7 +2051,7 @@
       ],
       "post": {
         "operationId": "cancelRun",
-        "x-implementation-status": "planned",
+        "x-implementation-status": "implemented",
         "security": [
           {
             "bearerAuth": []
@@ -1396,7 +2145,7 @@
       ],
       "get": {
         "operationId": "getRunResult",
-        "x-implementation-status": "planned",
+        "x-implementation-status": "implemented",
         "security": [
           {
             "bearerAuth": []
@@ -1490,7 +2239,7 @@
       ],
       "get": {
         "operationId": "getRunEvidence",
-        "x-implementation-status": "planned",
+        "x-implementation-status": "implemented",
         "security": [
           {
             "bearerAuth": []
@@ -1584,7 +2333,7 @@
       ],
       "get": {
         "operationId": "getRunContext",
-        "x-implementation-status": "planned",
+        "x-implementation-status": "implemented",
         "security": [
           {
             "bearerAuth": []
@@ -1678,7 +2427,7 @@
       ],
       "get": {
         "operationId": "exportRunCsv",
-        "x-implementation-status": "planned",
+        "x-implementation-status": "implemented",
         "security": [
           {
             "bearerAuth": []
@@ -1742,7 +2491,7 @@
       ],
       "get": {
         "operationId": "exportRunSql",
-        "x-implementation-status": "planned",
+        "x-implementation-status": "implemented",
         "security": [
           {
             "bearerAuth": []
@@ -1806,7 +2555,7 @@
       ],
       "get": {
         "operationId": "exportReproducibilityBundle",
-        "x-implementation-status": "planned",
+        "x-implementation-status": "implemented",
         "security": [
           {
             "bearerAuth": []
@@ -1900,7 +2649,7 @@
       ],
       "get": {
         "operationId": "getTruthLedger",
-        "x-implementation-status": "planned",
+        "x-implementation-status": "implemented",
         "security": [
           {
             "bearerAuth": []
@@ -1994,7 +2743,7 @@
       ],
       "get": {
         "operationId": "getQueryCostPassport",
-        "x-implementation-status": "planned",
+        "x-implementation-status": "implemented",
         "security": [
           {
             "bearerAuth": []
@@ -2088,7 +2837,7 @@
       ],
       "get": {
         "operationId": "getDirtyRadarReport",
-        "x-implementation-status": "planned",
+        "x-implementation-status": "implemented",
         "security": [
           {
             "bearerAuth": []
@@ -2182,7 +2931,7 @@
       ],
       "get": {
         "operationId": "getCounterfactualReport",
-        "x-implementation-status": "planned",
+        "x-implementation-status": "implemented",
         "security": [
           {
             "bearerAuth": []
@@ -2265,7 +3014,7 @@
     "/v1/recipes": {
       "post": {
         "operationId": "createRecipe",
-        "x-implementation-status": "planned",
+        "x-implementation-status": "implemented",
         "security": [
           {
             "bearerAuth": []
@@ -2356,7 +3105,7 @@
       },
       "get": {
         "operationId": "listRecipes",
-        "x-implementation-status": "planned",
+        "x-implementation-status": "implemented",
         "security": [
           {
             "bearerAuth": []
@@ -2450,7 +3199,7 @@
       ],
       "get": {
         "operationId": "getRecipe",
-        "x-implementation-status": "planned",
+        "x-implementation-status": "implemented",
         "security": [
           {
             "bearerAuth": []
@@ -2544,7 +3293,7 @@
       ],
       "post": {
         "operationId": "executeRecipe",
-        "x-implementation-status": "planned",
+        "x-implementation-status": "implemented",
         "security": [
           {
             "bearerAuth": []
@@ -2638,7 +3387,7 @@
       ],
       "post": {
         "operationId": "reviewRecipe",
-        "x-implementation-status": "planned",
+        "x-implementation-status": "implemented",
         "security": [
           {
             "bearerAuth": []
@@ -2732,7 +3481,7 @@
       ],
       "post": {
         "operationId": "publishRecipe",
-        "x-implementation-status": "planned",
+        "x-implementation-status": "implemented",
         "security": [
           {
             "bearerAuth": []
@@ -2836,7 +3585,7 @@
       ],
       "post": {
         "operationId": "retireRecipe",
-        "x-implementation-status": "planned",
+        "x-implementation-status": "implemented",
         "security": [
           {
             "bearerAuth": []
@@ -2919,7 +3668,7 @@
     "/v1/audit/events": {
       "get": {
         "operationId": "listAuditEvents",
-        "x-implementation-status": "planned",
+        "x-implementation-status": "implemented",
         "security": [
           {
             "bearerAuth": []
@@ -3002,7 +3751,7 @@
     "/v1/audit/export": {
       "get": {
         "operationId": "exportAuditEvents",
-        "x-implementation-status": "planned",
+        "x-implementation-status": "implemented",
         "security": [
           {
             "bearerAuth": []
@@ -3060,7 +3809,7 @@
     "/v1/governance/reviews": {
       "get": {
         "operationId": "getGovernanceReviews",
-        "x-implementation-status": "planned",
+        "x-implementation-status": "implemented",
         "security": [
           {
             "bearerAuth": []
@@ -3143,7 +3892,7 @@
     "/v1/governance/readiness": {
       "get": {
         "operationId": "getGovernanceReadiness",
-        "x-implementation-status": "planned",
+        "x-implementation-status": "implemented",
         "security": [
           {
             "bearerAuth": []
@@ -3226,7 +3975,7 @@
     "/v1/policies/effective": {
       "get": {
         "operationId": "getEffectivePolicy",
-        "x-implementation-status": "planned",
+        "x-implementation-status": "implemented",
         "security": [
           {
             "bearerAuth": []
@@ -3309,7 +4058,7 @@
     "/v1/policies/simulate": {
       "post": {
         "operationId": "simulatePolicy",
-        "x-implementation-status": "planned",
+        "x-implementation-status": "implemented",
         "security": [
           {
             "bearerAuth": []
@@ -3402,7 +4151,7 @@
     "/v1/feedback": {
       "post": {
         "operationId": "submitFeedback",
-        "x-implementation-status": "planned",
+        "x-implementation-status": "implemented",
         "security": [
           {
             "bearerAuth": []
@@ -3495,7 +4244,7 @@
     "/health/live": {
       "get": {
         "operationId": "getLiveness",
-        "x-implementation-status": "planned",
+        "x-implementation-status": "implemented",
         "security": [],
         "responses": {
           "200": {
@@ -3574,7 +4323,7 @@
     "/health/ready": {
       "get": {
         "operationId": "getReadiness",
-        "x-implementation-status": "planned",
+        "x-implementation-status": "implemented",
         "security": [],
         "responses": {
           "200": {
@@ -3659,6 +4408,486 @@
       }
     },
     "schemas": {
+      "StoredFile": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "kind",
+          "size",
+          "compressedSize",
+          "compression",
+          "sha256",
+          "rowCount",
+          "columns",
+          "emptyCells",
+          "createdAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "CSV"
+              },
+              {
+                "type": "string",
+                "const": "JSON"
+              },
+              {
+                "type": "string",
+                "const": "Text"
+              }
+            ]
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5242880
+          },
+          "compressedSize": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "compression": {
+            "type": "string",
+            "const": "br"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "rowCount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "columns": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 100
+          },
+          "emptyCells": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "FileUpload": {
+        "type": "object",
+        "required": [
+          "name",
+          "contentBase64"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "pattern": "^[^/\\\\\\u0000-\\u001f]+$"
+          },
+          "contentBase64": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 6990508
+          }
+        },
+        "additionalProperties": false
+      },
+      "FilePreview": {
+        "type": "object",
+        "required": [
+          "file",
+          "rows",
+          "text"
+        ],
+        "properties": {
+          "file": {
+            "type": "object",
+            "required": [
+              "id",
+              "name",
+              "kind",
+              "size",
+              "compressedSize",
+              "compression",
+              "sha256",
+              "rowCount",
+              "columns",
+              "emptyCells",
+              "createdAt"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+              },
+              "name": {
+                "type": "string",
+                "maxLength": 255
+              },
+              "kind": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "const": "CSV"
+                  },
+                  {
+                    "type": "string",
+                    "const": "JSON"
+                  },
+                  {
+                    "type": "string",
+                    "const": "Text"
+                  }
+                ]
+              },
+              "size": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 5242880
+              },
+              "compressedSize": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "compression": {
+                "type": "string",
+                "const": "br"
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "rowCount": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000
+              },
+              "columns": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 100
+              },
+              "emptyCells": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "additionalProperties": false
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "maxItems": 100
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 20000
+          }
+        },
+        "additionalProperties": false
+      },
+      "FileQuestion": {
+        "type": "object",
+        "required": [
+          "question"
+        ],
+        "properties": {
+          "question": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          }
+        },
+        "additionalProperties": false
+      },
+      "FileAnalysis": {
+        "type": "object",
+        "required": [
+          "id",
+          "fileId",
+          "question",
+          "result",
+          "modelVersion",
+          "sourceHash",
+          "method",
+          "createdAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "fileId": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "question": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "result": {
+            "type": "object",
+            "required": [
+              "answer",
+              "columns",
+              "rows"
+            ],
+            "properties": {
+              "answer": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "required": [
+                      "runId",
+                      "assumptions",
+                      "limitations",
+                      "status",
+                      "answerText",
+                      "definition",
+                      "resultReference",
+                      "sqlReference",
+                      "evidence"
+                    ],
+                    "properties": {
+                      "runId": {
+                        "type": "string",
+                        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                      },
+                      "assumptions": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 4096
+                        },
+                        "maxItems": 50
+                      },
+                      "limitations": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 4096
+                        },
+                        "maxItems": 50
+                      },
+                      "status": {
+                        "type": "string",
+                        "const": "answered"
+                      },
+                      "answerText": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 4096
+                      },
+                      "definition": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 4096
+                      },
+                      "resultReference": {
+                        "type": "string",
+                        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                      },
+                      "sqlReference": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "evidence": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 4096
+                        },
+                        "minItems": 1,
+                        "maxItems": 100
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "runId",
+                      "assumptions",
+                      "limitations",
+                      "status",
+                      "reason",
+                      "nextAction"
+                    ],
+                    "properties": {
+                      "runId": {
+                        "type": "string",
+                        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                      },
+                      "assumptions": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 4096
+                        },
+                        "maxItems": 50
+                      },
+                      "limitations": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 4096
+                        },
+                        "maxItems": 50
+                      },
+                      "status": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "const": "needs_clarification"
+                          },
+                          {
+                            "type": "string",
+                            "const": "abstained"
+                          },
+                          {
+                            "type": "string",
+                            "const": "blocked_by_policy"
+                          },
+                          {
+                            "type": "string",
+                            "const": "execution_failed"
+                          },
+                          {
+                            "type": "string",
+                            "const": "timed_out"
+                          },
+                          {
+                            "type": "string",
+                            "const": "cancelled"
+                          }
+                        ]
+                      },
+                      "reason": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 4096
+                      },
+                      "nextAction": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 4096
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                ]
+              },
+              "columns": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                "maxItems": 100
+              },
+              "rows": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "patternProperties": {
+                    "^.*$": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 16384
+                        },
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "boolean"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  }
+                },
+                "maxItems": 1000
+              }
+            },
+            "additionalProperties": false
+          },
+          "modelVersion": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "sourceHash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "method": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "deterministic"
+              },
+              {
+                "type": "string",
+                "const": "model-planned-computation"
+              },
+              {
+                "type": "string",
+                "const": "extractive"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
       "QuestionIntent": {
         "type": "object",
         "required": [
@@ -4409,8 +5638,15 @@
                 "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
               },
               "sqlReference": {
-                "type": "string",
-                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               },
               "evidence": {
                 "type": "array",
@@ -4753,8 +5989,15 @@
                     "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
                   },
                   "sqlReference": {
-                    "type": "string",
-                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   },
                   "evidence": {
                     "type": "array",
@@ -7397,8 +8640,15 @@
                     "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
                   },
                   "sqlReference": {
-                    "type": "string",
-                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   },
                   "evidence": {
                     "type": "array",

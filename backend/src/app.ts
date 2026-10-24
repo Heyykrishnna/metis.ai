@@ -12,12 +12,13 @@ import {
 import { logger } from "./logger.js";
 import { analysisRoutes } from "./routes/analyses.js";
 import { connectionRoutes } from "./routes/connections.js";
+import { capabilitiesRoutes } from "./routes/capabilities.js";
+import { fileRoutes } from "./routes/files.js";
 import { feedbackRoutes } from "./routes/feedback.js";
 import { governanceRoutes } from "./routes/governance.js";
 import { healthRoutes } from "./routes/health.js";
 import { policyRoutes } from "./routes/policies.js";
 import { recipeRoutes } from "./routes/recipes.js";
-import { PostgresAnalyticalAdapter } from "./sql/adapter.js";
 import type { ConnectorAdapter } from "./sql/connectors.js";
 
 declare module "fastify" {
@@ -32,6 +33,7 @@ export interface BuildAppOptions {
   adapter?: ConnectorAdapter;
   inference?: InferenceClient;
   orchestrator?: AnalysisOrchestrator;
+  useModelPlanning?: boolean;
 }
 
 export async function buildApp(
@@ -62,77 +64,15 @@ export async function buildApp(
     });
   }
 
-  const defaultAdapter: ConnectorAdapter =
-    options.adapter ??
-    (options.databaseUrl
-      ? new PostgresAnalyticalAdapter({ connectionString: options.databaseUrl })
-      : {
-          id: "default-analytical",
-          dialect: "PostgreSQL" as const,
-          async query(input) {
-            if (input.sql.includes("information_schema.tables")) {
-              return {
-                columns: ["schema", "name"],
-                rows: [
-                  { schema: "analytics_clean", name: "schools" },
-                  { schema: "analytics_clean", name: "enrolments" },
-                ],
-              };
-            }
-            if (input.sql.includes("information_schema.columns")) {
-              return {
-                columns: ["schema", "table_name", "name", "type", "nullable"],
-                rows: [
-                  {
-                    schema: "analytics_clean",
-                    table_name: "schools",
-                    name: "id",
-                    type: "integer",
-                    nullable: false,
-                  },
-                  {
-                    schema: "analytics_clean",
-                    table_name: "schools",
-                    name: "name",
-                    type: "text",
-                    nullable: false,
-                  },
-                  {
-                    schema: "analytics_clean",
-                    table_name: "enrolments",
-                    name: "school_id",
-                    type: "integer",
-                    nullable: false,
-                  },
-                  {
-                    schema: "analytics_clean",
-                    table_name: "enrolments",
-                    name: "year",
-                    type: "integer",
-                    nullable: false,
-                  },
-                  {
-                    schema: "analytics_clean",
-                    table_name: "enrolments",
-                    name: "enrolled",
-                    type: "integer",
-                    nullable: true,
-                  },
-                ],
-              };
-            }
-            if (input.sql.includes("count(*)")) {
-              return { columns: ["cnt"], rows: [{ cnt: 6 }] };
-            }
-            return {
-              columns: ["school_id", "delta"],
-              rows: [
-                { school_id: 1, delta: -20 },
-                { school_id: 4, delta: -10 },
-              ],
-            };
-          },
-        });
+  const defaultAdapter: ConnectorAdapter = options.adapter ?? {
+    id: "unconfigured-analytical-source",
+    dialect: "PostgreSQL",
+    async query() {
+      throw new Error(
+        "No read-only analytical source is configured. Upload and select a file to use the stored-file analysis service.",
+      );
+    },
+  };
 
   const defaultInference: InferenceClient =
     options.inference ?? new OllamaInferenceClient();
@@ -143,11 +83,15 @@ export async function buildApp(
       adapter: defaultAdapter,
       inference: defaultInference,
       metadataDb: metadata?.db ?? null,
+      useModelPlanning:
+        options.useModelPlanning ?? options.adapter === undefined,
     });
 
   app.decorate("orchestrator", orchestrator);
 
   await app.register(healthRoutes);
+  await app.register(fileRoutes);
+  await app.register(capabilitiesRoutes);
   await app.register(connectionRoutes);
   await app.register(analysisRoutes);
   await app.register(feedbackRoutes);

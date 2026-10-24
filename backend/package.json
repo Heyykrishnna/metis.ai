@@ -20,6 +20,7 @@
     "lint": "cd .. && backend/node_modules/.bin/oxlint --deny-warnings backend/src backend/test backend/scripts backend/*.ts scripts",
     "format": "prettier --write src test scripts *.ts *.json ../scripts ../docs/engineering ../inference ../compose.yaml ../.github/workflows ../README.md ../GLOSSARY.md ../skills.lock.json ../.prettierrc.json",
     "format:check": "prettier --check src test scripts *.ts *.json ../scripts ../docs/engineering ../inference ../compose.yaml ../.github/workflows ../README.md ../GLOSSARY.md ../skills.lock.json ../.prettierrc.json",
+    "test:files:live": "node --import tsx scripts/check-file-flow.ts --model",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "contracts:generate": "node --import tsx scripts/contracts.ts",
     "contracts:check": "node --import tsx scripts/contracts.ts --check",
@@ -31,6 +32,8 @@
   "dependencies": {
     "@fastify/type-provider-typebox": "^6.3.0",
     "ajv-formats": "^3.0.1",
+    "csv-parse": "^7.0.3",
+    "decimal.js": "^10.6.0",
     "dotenv": "^18.0.9",
     "drizzle-orm": "^0.45.4",
     "fastify": "^5.12.7",

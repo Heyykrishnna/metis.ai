@@ -3,6 +3,7 @@ import { Icon } from "./icon";
 export function SettingsView({
   workspaceName,
   apiStatus,
+  inferenceAvailable,
   hasQuestions,
   onRename,
   onCheck,
@@ -11,6 +12,7 @@ export function SettingsView({
   workspaceName: string;
   apiStatus: "checking" | "online" | "offline";
   hasQuestions: boolean;
+  inferenceAvailable: boolean;
   onRename: (name: string) => void;
   onCheck: () => void;
   onClear: () => void;
@@ -69,18 +71,20 @@ export function SettingsView({
           <div>
             <strong>Analysis & inference</strong>
             <p>
-              Qwen2.5-Coder 7B is configured. An analysis API is needed to run
-              questions.
+              Qwen2.5-Coder plans file calculations locally. Stored table
+              overviews and row counts also work without inference.
             </p>
           </div>
-          <span className="badge">Not available</span>
+          <span className="badge">
+            {inferenceAvailable ? "Model ready" : "Model unavailable"}
+          </span>
         </div>
       </section>
       <section className="panel">
         <h2>Privacy & local storage</h2>
         <p className="muted">
-          Files are read in browser memory and are never sent to a server. Up to
-          100 question drafts, including source filenames, are saved in this
+          Files are compressed with Brotli and stored in Neon. Up to 100
+          question drafts, including source filenames, are saved in this
           browser. Avoid including secrets in questions.
         </p>
         <button
