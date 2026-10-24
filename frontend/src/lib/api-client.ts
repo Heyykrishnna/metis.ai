@@ -18,6 +18,10 @@ export type RecipeInput = components["schemas"]["RecipeInput"];
 export type RecipeExecuteResponse =
   components["schemas"]["RecipeExecuteResponse"];
 export type Feedback = components["schemas"]["Feedback"];
+export type EffectivePolicy = components["schemas"]["EffectivePolicy"];
+export type PolicySimulateInput = components["schemas"]["PolicySimulateInput"];
+export type PolicySimulateResult =
+  components["schemas"]["PolicySimulateResult"];
 
 function resolveUrl(path: string, baseUrl?: string): string {
   if (baseUrl) {
@@ -232,6 +236,22 @@ export async function submitFeedback(
   return fetchJson<{ id: string }>("/v1/feedback", {
     method: "POST",
     body: JSON.stringify(payload),
+  });
+}
+
+export async function getEffectivePolicy(
+  role?: string,
+): Promise<EffectivePolicy> {
+  const query = role ? `?role=${encodeURIComponent(role)}` : "";
+  return fetchJson<EffectivePolicy>(`/v1/policies/effective${query}`);
+}
+
+export async function simulatePolicy(
+  input: PolicySimulateInput,
+): Promise<PolicySimulateResult> {
+  return fetchJson<PolicySimulateResult>("/v1/policies/simulate", {
+    method: "POST",
+    body: JSON.stringify(input),
   });
 }
 

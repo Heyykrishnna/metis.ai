@@ -19,6 +19,8 @@ import {
   executeRecipe,
   submitFeedback,
   getExportUrl,
+  getEffectivePolicy,
+  simulatePolicy,
   type ConnectionInput,
 } from "../src/lib/api-client";
 
@@ -343,4 +345,44 @@ it("supports recipes, feedback, and export url generation", async () => {
   expect(getExportUrl("r1", "reproducibility")).toBe(
     "/api/backend/v1/runs/r1/export/reproducibility",
   );
+});
+
+it("supports effective policy inspection and policy simulation", async () => {
+  const fetchMock = vi
+    .fn()
+    .mockResolvedValueOnce(
+      Response.json({
+        role: "viewer",
+        policyVersion: "1.0.0",
+        permittedActions: ["read_published", "run_approved_recipe"],
+        rowBoundaryPredicate: "organization_id = CURRENT_ORG",
+        allowedColumns: ["school_name", "enrolment_count"],
+        restrictedColumns: ["id", "national_id"],
+        smallCohortThreshold: 5,
+      }),
+    )
+    .mockResolvedValueOnce(
+      Response.json({
+        allowed: false,
+        targetRole: "viewer",
+        evaluatedPolicyVersion: "1.0.0",
+        rowBoundaryPredicate: "organization_id = CURRENT_ORG",
+        violations: ["direct_sql_not_permitted"],
+        effectiveColumns: [],
+        reason: "Role viewer is not permitted to execute arbitrary SQL",
+      }),
+    );
+
+  vi.stubGlobal("fetch", fetchMock);
+
+  const policy = await getEffectivePolicy("viewer");
+  expect(policy.role).toBe("viewer");
+  expect(policy.smallCohortThreshold).toBe(5);
+
+  const sim = await simulatePolicy({
+    targetRole: "viewer",
+    sql: "SELECT * FROM analytics_clean.enrolments",
+  });
+  expect(sim.allowed).toBe(false);
+  expect(sim.violations).toContain("direct_sql_not_permitted");
 });
