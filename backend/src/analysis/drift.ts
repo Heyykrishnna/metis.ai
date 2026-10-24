@@ -52,6 +52,7 @@ export function saveSchemaMapping(
   const existing = inMemoryMappings.get(connectionId) ?? [];
   const id = randomUUID();
   const now = new Date().toISOString();
+  const status = request.status ?? "approved";
   const mapping: SchemaMapping = {
     id,
     connectionId,
@@ -61,10 +62,9 @@ export function saveSchemaMapping(
     joinKey: request.joinKey,
     partitionColumn: request.partitionColumn,
     columnRules: request.columnRules,
-    status: request.status ?? "approved",
-    reviewedBy:
-      reviewedBy ?? (request.status === "approved" ? "admin" : undefined),
-    reviewedAt: request.status === "approved" ? now : undefined,
+    status,
+    reviewedBy: status === "approved" ? (reviewedBy ?? "admin") : undefined,
+    reviewedAt: status === "approved" ? now : undefined,
     createdAt: now,
   };
   existing.push(mapping);
@@ -72,10 +72,39 @@ export function saveSchemaMapping(
   return mapping;
 }
 
+export function createSchemaMapping(params: {
+  connectionId: string;
+  sourceTable: string;
+  targetTables: string[];
+  mappingType: "rename" | "split_horizontal" | "split_vertical";
+  joinKey?: string;
+  partitionColumn?: string;
+  columnRules: SchemaMappingRequest["columnRules"];
+  status?: "proposed" | "approved" | "rejected";
+}): SchemaMapping {
+  return saveSchemaMapping(params.connectionId, {
+    sourceTable: params.sourceTable,
+    targetTables: params.targetTables,
+    mappingType: params.mappingType,
+    joinKey: params.joinKey,
+    partitionColumn: params.partitionColumn,
+    columnRules: params.columnRules,
+    status: params.status ?? "proposed",
+  });
+}
+
 export function getMappingsForConnection(
   connectionId: string,
 ): SchemaMapping[] {
   return inMemoryMappings.get(connectionId) ?? [];
+}
+
+export function getAllMappings(): SchemaMapping[] {
+  const result: SchemaMapping[] = [];
+  for (const list of inMemoryMappings.values()) {
+    result.push(...list);
+  }
+  return result;
 }
 
 export function getMappingForSource(

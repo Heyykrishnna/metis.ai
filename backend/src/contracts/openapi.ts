@@ -43,6 +43,14 @@ import {
   SchemaMappingRequestSchema,
   SchemaMappingSchema,
 } from "./drift.js";
+import {
+  AuditEventSchema,
+  AuditListResponseSchema,
+  GovernanceReadinessResponseSchema,
+  GovernanceReviewsResponseSchema,
+  GovernanceReviewTaskSchema,
+  RecipePublishInputSchema,
+} from "./governance.js";
 
 const apiSchemas = {
   QuestionIntent: QuestionIntentSchema,
@@ -87,6 +95,12 @@ const apiSchemas = {
   SchemaMapping: SchemaMappingSchema,
   SchemaMappings: Type.Array(SchemaMappingSchema, { maxItems: 100 }),
   ImpactPreviewResponse: ImpactPreviewResponseSchema,
+  AuditEvent: AuditEventSchema,
+  AuditListResponse: AuditListResponseSchema,
+  GovernanceReviewTask: GovernanceReviewTaskSchema,
+  GovernanceReviewsResponse: GovernanceReviewsResponseSchema,
+  GovernanceReadinessResponse: GovernanceReadinessResponseSchema,
+  RecipePublishInput: RecipePublishInputSchema,
 };
 function ref(name: keyof typeof apiSchemas) {
   return Type.Ref(`#/components/schemas/${name}`);
@@ -326,6 +340,59 @@ export const openApiDocument = {
         ref("RecipeExecuteResponse"),
         undefined,
         "202",
+      ),
+    },
+    "/v1/recipes/{recipeId}/review": {
+      parameters: [
+        { name: "recipeId", in: "path", required: true, schema: IdSchema },
+      ],
+      post: operation("reviewRecipe", ref("Recipe")),
+    },
+    "/v1/recipes/{recipeId}/publish": {
+      parameters: [
+        { name: "recipeId", in: "path", required: true, schema: IdSchema },
+      ],
+      post: operation(
+        "publishRecipe",
+        ref("Recipe"),
+        ref("RecipePublishInput"),
+      ),
+    },
+    "/v1/recipes/{recipeId}/retire": {
+      parameters: [
+        { name: "recipeId", in: "path", required: true, schema: IdSchema },
+      ],
+      post: operation("retireRecipe", ref("Recipe")),
+    },
+    "/v1/audit/events": {
+      get: operation("listAuditEvents", ref("AuditListResponse")),
+    },
+    "/v1/audit/export": {
+      get: {
+        operationId: "exportAuditEvents",
+        "x-implementation-status": "planned",
+        security: [{ bearerAuth: [] }],
+        responses: {
+          "200": {
+            description: "Safe audit log export in JSON or CSV",
+            content: {
+              "application/json": { schema: Type.String() },
+              "text/csv": { schema: Type.String() },
+            },
+          },
+          "401": response(ref("Error"), "Authentication required"),
+          "403": response(ref("Error"), "Access denied"),
+          "404": response(ref("Error"), "Resource unavailable"),
+        },
+      },
+    },
+    "/v1/governance/reviews": {
+      get: operation("getGovernanceReviews", ref("GovernanceReviewsResponse")),
+    },
+    "/v1/governance/readiness": {
+      get: operation(
+        "getGovernanceReadiness",
+        ref("GovernanceReadinessResponse"),
       ),
     },
     "/v1/policies/effective": {

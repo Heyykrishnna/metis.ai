@@ -463,6 +463,124 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/recipes/{recipeId}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                recipeId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["reviewRecipe"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/recipes/{recipeId}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                recipeId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["publishRecipe"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/recipes/{recipeId}/retire": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                recipeId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["retireRecipe"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/audit/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listAuditEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/audit/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["exportAuditEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/governance/reviews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getGovernanceReviews"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/governance/readiness": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getGovernanceReadiness"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/policies/effective": {
         parameters: {
             query?: never;
@@ -1172,7 +1290,8 @@ export interface components {
             grain: string[];
             timeframePolicy: string;
             nullExclusionPolicy: string;
-            approvalStatus: "draft" | "approved" | "archived";
+            approvalStatus?: "draft" | "reviewed" | "published" | "retired" | "approved" | "archived";
+            audienceScope?: "private" | "role_restricted" | "workspace";
         };
         Recipe: {
             id: string;
@@ -1190,7 +1309,26 @@ export interface components {
             grain: string[];
             timeframePolicy: string;
             nullExclusionPolicy: string;
-            approvalStatus: "draft" | "approved" | "archived";
+            approvalStatus: "draft" | "reviewed" | "published" | "retired" | "approved" | "archived";
+            audienceScope?: "private" | "role_restricted" | "workspace";
+            reviewedBy?: string;
+            /** Format: date-time */
+            reviewedAt?: string;
+            publishedBy?: string;
+            /** Format: date-time */
+            publishedAt?: string;
+            retiredBy?: string;
+            /** Format: date-time */
+            retiredAt?: string;
+            versionHistory?: {
+                version: number;
+                changeDescription: string;
+                updatedBy: string;
+                /** Format: date-time */
+                updatedAt: string;
+            }[];
+            policyVersion?: string;
+            snapshotHash?: string;
             /** Format: date-time */
             createdAt: string;
         };
@@ -1210,7 +1348,26 @@ export interface components {
             grain: string[];
             timeframePolicy: string;
             nullExclusionPolicy: string;
-            approvalStatus: "draft" | "approved" | "archived";
+            approvalStatus: "draft" | "reviewed" | "published" | "retired" | "approved" | "archived";
+            audienceScope?: "private" | "role_restricted" | "workspace";
+            reviewedBy?: string;
+            /** Format: date-time */
+            reviewedAt?: string;
+            publishedBy?: string;
+            /** Format: date-time */
+            publishedAt?: string;
+            retiredBy?: string;
+            /** Format: date-time */
+            retiredAt?: string;
+            versionHistory?: {
+                version: number;
+                changeDescription: string;
+                updatedBy: string;
+                /** Format: date-time */
+                updatedAt: string;
+            }[];
+            policyVersion?: string;
+            snapshotHash?: string;
             /** Format: date-time */
             createdAt: string;
         }[];
@@ -1421,6 +1578,123 @@ export interface components {
                 staleSources: string[];
             }[];
             recommendedActions: string[];
+        };
+        AuditEvent: {
+            id: string;
+            workspaceId: string;
+            category: "policy_change" | "denied_attempt" | "conversation_context" | "schema_recovery" | "recipe_lifecycle" | "access_review" | "export_decision";
+            action: string;
+            actorSubject: string;
+            actorRole: string;
+            resourceId: string;
+            requestId: string;
+            runId?: string;
+            details: {
+                [key: string]: unknown;
+            };
+            /** Format: date-time */
+            occurredAt: string;
+            tamperEvidenceHash: string;
+        };
+        AuditListResponse: {
+            events: {
+                id: string;
+                workspaceId: string;
+                category: "policy_change" | "denied_attempt" | "conversation_context" | "schema_recovery" | "recipe_lifecycle" | "access_review" | "export_decision";
+                action: string;
+                actorSubject: string;
+                actorRole: string;
+                resourceId: string;
+                requestId: string;
+                runId?: string;
+                details: {
+                    [key: string]: unknown;
+                };
+                /** Format: date-time */
+                occurredAt: string;
+                tamperEvidenceHash: string;
+            }[];
+            total: number;
+            limit: number;
+            offset: number;
+        };
+        GovernanceReviewTask: {
+            id: string;
+            taskType: "schema_mapping" | "recipe_publication" | "access_request";
+            title: string;
+            description: string;
+            resourceId: string;
+            requestedBy: string;
+            /** Format: date-time */
+            requestedAt: string;
+            status: "pending" | "approved" | "rejected";
+        };
+        GovernanceReviewsResponse: {
+            tasks: {
+                id: string;
+                taskType: "schema_mapping" | "recipe_publication" | "access_request";
+                title: string;
+                description: string;
+                resourceId: string;
+                requestedBy: string;
+                /** Format: date-time */
+                requestedAt: string;
+                status: "pending" | "approved" | "rejected";
+            }[];
+            pendingCount: number;
+        };
+        GovernanceReadinessResponse: {
+            candidateVersion: string;
+            status: "ready_for_release" | "blocked";
+            releaseManifest: {
+                candidateVersion: string;
+                modelArtifacts: {
+                    [key: string]: string;
+                };
+                promptTemplates: {
+                    [key: string]: string;
+                };
+                policyEngine: {
+                    [key: string]: string;
+                };
+                runtimeEnvironment: {
+                    [key: string]: string;
+                };
+                measuredLimits: {
+                    [key: string]: number;
+                };
+                reviewerSignOffs: {
+                    [key: string]: string;
+                };
+                recoveryInstructions: string;
+            };
+            requirementCoverage: {
+                requirementId: string;
+                title: string;
+                status: string;
+                owner: string;
+                verifiedGate: string;
+            }[];
+            gateMetrics: {
+                g6OrganizationPermissions: {
+                    [key: string]: unknown;
+                };
+                g7ConversationalFollowUps: {
+                    [key: string]: unknown;
+                };
+                g8SchemaEvolutionRecovery: {
+                    [key: string]: unknown;
+                };
+                g9GovernedCollaboration: {
+                    [key: string]: unknown;
+                };
+            };
+            /** Format: date-time */
+            generatedAt: string;
+        };
+        RecipePublishInput: {
+            audienceScope?: "private" | "role_restricted" | "workspace";
+            changeDescription?: string;
         };
     };
     responses: never;
@@ -3525,6 +3799,508 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RecipeExecuteResponse"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Access denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Resource unavailable */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Resource limit reached */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Dependency unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    reviewRecipe: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                recipeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Recipe"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Access denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Resource unavailable */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Resource limit reached */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Dependency unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    publishRecipe: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                recipeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecipePublishInput"];
+            };
+        };
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Recipe"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Access denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Resource unavailable */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Resource limit reached */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Dependency unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    retireRecipe: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                recipeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Recipe"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Access denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Resource unavailable */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Resource limit reached */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Dependency unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listAuditEvents: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditListResponse"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Access denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Resource unavailable */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Resource limit reached */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Dependency unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    exportAuditEvents: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Safe audit log export in JSON or CSV */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": string;
+                    "text/csv": string;
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Access denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Resource unavailable */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getGovernanceReviews: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GovernanceReviewsResponse"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Access denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Resource unavailable */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Resource limit reached */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Dependency unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getGovernanceReadiness: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GovernanceReadinessResponse"];
                 };
             };
             /** @description Invalid request */

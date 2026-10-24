@@ -2624,6 +2624,605 @@
         }
       }
     },
+    "/v1/recipes/{recipeId}/review": {
+      "parameters": [
+        {
+          "name": "recipeId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          }
+        }
+      ],
+      "post": {
+        "operationId": "reviewRecipe",
+        "x-implementation-status": "planned",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Recipe"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Resource limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/recipes/{recipeId}/publish": {
+      "parameters": [
+        {
+          "name": "recipeId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          }
+        }
+      ],
+      "post": {
+        "operationId": "publishRecipe",
+        "x-implementation-status": "planned",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecipePublishInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Recipe"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Resource limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/recipes/{recipeId}/retire": {
+      "parameters": [
+        {
+          "name": "recipeId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          }
+        }
+      ],
+      "post": {
+        "operationId": "retireRecipe",
+        "x-implementation-status": "planned",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Recipe"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Resource limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/audit/events": {
+      "get": {
+        "operationId": "listAuditEvents",
+        "x-implementation-status": "planned",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Resource limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/audit/export": {
+      "get": {
+        "operationId": "exportAuditEvents",
+        "x-implementation-status": "planned",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Safe audit log export in JSON or CSV",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/governance/reviews": {
+      "get": {
+        "operationId": "getGovernanceReviews",
+        "x-implementation-status": "planned",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GovernanceReviewsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Resource limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/governance/readiness": {
+      "get": {
+        "operationId": "getGovernanceReadiness",
+        "x-implementation-status": "planned",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GovernanceReadinessResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Resource limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/policies/effective": {
       "get": {
         "operationId": "getEffectivePolicy",
@@ -7502,8 +8101,7 @@
           "sqlText",
           "grain",
           "timeframePolicy",
-          "nullExclusionPolicy",
-          "approvalStatus"
+          "nullExclusionPolicy"
         ],
         "properties": {
           "name": {
@@ -7567,11 +8165,39 @@
               },
               {
                 "type": "string",
+                "const": "reviewed"
+              },
+              {
+                "type": "string",
+                "const": "published"
+              },
+              {
+                "type": "string",
+                "const": "retired"
+              },
+              {
+                "type": "string",
                 "const": "approved"
               },
               {
                 "type": "string",
                 "const": "archived"
+              }
+            ]
+          },
+          "audienceScope": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "private"
+              },
+              {
+                "type": "string",
+                "const": "role_restricted"
+              },
+              {
+                "type": "string",
+                "const": "workspace"
               }
             ]
           }
@@ -7673,6 +8299,18 @@
               },
               {
                 "type": "string",
+                "const": "reviewed"
+              },
+              {
+                "type": "string",
+                "const": "published"
+              },
+              {
+                "type": "string",
+                "const": "retired"
+              },
+              {
+                "type": "string",
                 "const": "approved"
               },
               {
@@ -7680,6 +8318,91 @@
                 "const": "archived"
               }
             ]
+          },
+          "audienceScope": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "private"
+              },
+              {
+                "type": "string",
+                "const": "role_restricted"
+              },
+              {
+                "type": "string",
+                "const": "workspace"
+              }
+            ]
+          },
+          "reviewedBy": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "reviewedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "publishedBy": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "retiredBy": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "retiredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "versionHistory": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "version",
+                "changeDescription",
+                "updatedBy",
+                "updatedAt"
+              ],
+              "properties": {
+                "version": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "changeDescription": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                "updatedBy": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              }
+            }
+          },
+          "policyVersion": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "snapshotHash": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
           },
           "createdAt": {
             "type": "string",
@@ -7785,6 +8508,18 @@
                 },
                 {
                   "type": "string",
+                  "const": "reviewed"
+                },
+                {
+                  "type": "string",
+                  "const": "published"
+                },
+                {
+                  "type": "string",
+                  "const": "retired"
+                },
+                {
+                  "type": "string",
                   "const": "approved"
                 },
                 {
@@ -7792,6 +8527,91 @@
                   "const": "archived"
                 }
               ]
+            },
+            "audienceScope": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "const": "private"
+                },
+                {
+                  "type": "string",
+                  "const": "role_restricted"
+                },
+                {
+                  "type": "string",
+                  "const": "workspace"
+                }
+              ]
+            },
+            "reviewedBy": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            "reviewedAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "publishedBy": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            "publishedAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "retiredBy": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            "retiredAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "versionHistory": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "version",
+                  "changeDescription",
+                  "updatedBy",
+                  "updatedAt"
+                ],
+                "properties": {
+                  "version": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "changeDescription": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4096
+                  },
+                  "updatedBy": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4096
+                  },
+                  "updatedAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                }
+              }
+            },
+            "policyVersion": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            "snapshotHash": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
             },
             "createdAt": {
               "type": "string",
@@ -9245,6 +10065,605 @@
               "maxLength": 4096
             },
             "maxItems": 50
+          }
+        },
+        "additionalProperties": false
+      },
+      "AuditEvent": {
+        "type": "object",
+        "required": [
+          "id",
+          "workspaceId",
+          "category",
+          "action",
+          "actorSubject",
+          "actorRole",
+          "resourceId",
+          "requestId",
+          "details",
+          "occurredAt",
+          "tamperEvidenceHash"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "workspaceId": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "policy_change"
+              },
+              {
+                "type": "string",
+                "const": "denied_attempt"
+              },
+              {
+                "type": "string",
+                "const": "conversation_context"
+              },
+              {
+                "type": "string",
+                "const": "schema_recovery"
+              },
+              {
+                "type": "string",
+                "const": "recipe_lifecycle"
+              },
+              {
+                "type": "string",
+                "const": "access_review"
+              },
+              {
+                "type": "string",
+                "const": "export_decision"
+              }
+            ]
+          },
+          "action": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "actorSubject": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "actorRole": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 50
+          },
+          "resourceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "requestId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "runId": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "details": {
+            "type": "object",
+            "patternProperties": {
+              "^.*$": {}
+            }
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "tamperEvidenceHash": {
+            "type": "string",
+            "minLength": 32,
+            "maxLength": 128
+          }
+        },
+        "additionalProperties": false
+      },
+      "AuditListResponse": {
+        "type": "object",
+        "required": [
+          "events",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "workspaceId",
+                "category",
+                "action",
+                "actorSubject",
+                "actorRole",
+                "resourceId",
+                "requestId",
+                "details",
+                "occurredAt",
+                "tamperEvidenceHash"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                },
+                "workspaceId": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                },
+                "category": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "const": "policy_change"
+                    },
+                    {
+                      "type": "string",
+                      "const": "denied_attempt"
+                    },
+                    {
+                      "type": "string",
+                      "const": "conversation_context"
+                    },
+                    {
+                      "type": "string",
+                      "const": "schema_recovery"
+                    },
+                    {
+                      "type": "string",
+                      "const": "recipe_lifecycle"
+                    },
+                    {
+                      "type": "string",
+                      "const": "access_review"
+                    },
+                    {
+                      "type": "string",
+                      "const": "export_decision"
+                    }
+                  ]
+                },
+                "action": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                "actorSubject": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                "actorRole": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 50
+                },
+                "resourceId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                "requestId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                "runId": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                },
+                "details": {
+                  "type": "object",
+                  "patternProperties": {
+                    "^.*$": {}
+                  }
+                },
+                "occurredAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "tamperEvidenceHash": {
+                  "type": "string",
+                  "minLength": 32,
+                  "maxLength": 128
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "GovernanceReviewTask": {
+        "type": "object",
+        "required": [
+          "id",
+          "taskType",
+          "title",
+          "description",
+          "resourceId",
+          "requestedBy",
+          "requestedAt",
+          "status"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "taskType": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "schema_mapping"
+              },
+              {
+                "type": "string",
+                "const": "recipe_publication"
+              },
+              {
+                "type": "string",
+                "const": "access_request"
+              }
+            ]
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "resourceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "requestedBy": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "requestedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "pending"
+              },
+              {
+                "type": "string",
+                "const": "approved"
+              },
+              {
+                "type": "string",
+                "const": "rejected"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "GovernanceReviewsResponse": {
+        "type": "object",
+        "required": [
+          "tasks",
+          "pendingCount"
+        ],
+        "properties": {
+          "tasks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "taskType",
+                "title",
+                "description",
+                "resourceId",
+                "requestedBy",
+                "requestedAt",
+                "status"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                "taskType": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "const": "schema_mapping"
+                    },
+                    {
+                      "type": "string",
+                      "const": "recipe_publication"
+                    },
+                    {
+                      "type": "string",
+                      "const": "access_request"
+                    }
+                  ]
+                },
+                "title": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                "description": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1000
+                },
+                "resourceId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                "requestedBy": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                "requestedAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "status": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "const": "pending"
+                    },
+                    {
+                      "type": "string",
+                      "const": "approved"
+                    },
+                    {
+                      "type": "string",
+                      "const": "rejected"
+                    }
+                  ]
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "pendingCount": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "GovernanceReadinessResponse": {
+        "type": "object",
+        "required": [
+          "candidateVersion",
+          "status",
+          "releaseManifest",
+          "requirementCoverage",
+          "gateMetrics",
+          "generatedAt"
+        ],
+        "properties": {
+          "candidateVersion": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "ready_for_release"
+              },
+              {
+                "type": "string",
+                "const": "blocked"
+              }
+            ]
+          },
+          "releaseManifest": {
+            "type": "object",
+            "required": [
+              "candidateVersion",
+              "modelArtifacts",
+              "promptTemplates",
+              "policyEngine",
+              "runtimeEnvironment",
+              "measuredLimits",
+              "reviewerSignOffs",
+              "recoveryInstructions"
+            ],
+            "properties": {
+              "candidateVersion": {
+                "type": "string"
+              },
+              "modelArtifacts": {
+                "type": "object",
+                "patternProperties": {
+                  "^.*$": {
+                    "type": "string"
+                  }
+                }
+              },
+              "promptTemplates": {
+                "type": "object",
+                "patternProperties": {
+                  "^.*$": {
+                    "type": "string"
+                  }
+                }
+              },
+              "policyEngine": {
+                "type": "object",
+                "patternProperties": {
+                  "^.*$": {
+                    "type": "string"
+                  }
+                }
+              },
+              "runtimeEnvironment": {
+                "type": "object",
+                "patternProperties": {
+                  "^.*$": {
+                    "type": "string"
+                  }
+                }
+              },
+              "measuredLimits": {
+                "type": "object",
+                "patternProperties": {
+                  "^.*$": {
+                    "type": "number"
+                  }
+                }
+              },
+              "reviewerSignOffs": {
+                "type": "object",
+                "patternProperties": {
+                  "^.*$": {
+                    "type": "string"
+                  }
+                }
+              },
+              "recoveryInstructions": {
+                "type": "string"
+              }
+            }
+          },
+          "requirementCoverage": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "requirementId",
+                "title",
+                "status",
+                "owner",
+                "verifiedGate"
+              ],
+              "properties": {
+                "requirementId": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "owner": {
+                  "type": "string"
+                },
+                "verifiedGate": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "gateMetrics": {
+            "type": "object",
+            "required": [
+              "g6OrganizationPermissions",
+              "g7ConversationalFollowUps",
+              "g8SchemaEvolutionRecovery",
+              "g9GovernedCollaboration"
+            ],
+            "properties": {
+              "g6OrganizationPermissions": {
+                "type": "object",
+                "patternProperties": {
+                  "^.*$": {}
+                }
+              },
+              "g7ConversationalFollowUps": {
+                "type": "object",
+                "patternProperties": {
+                  "^.*$": {}
+                }
+              },
+              "g8SchemaEvolutionRecovery": {
+                "type": "object",
+                "patternProperties": {
+                  "^.*$": {}
+                }
+              },
+              "g9GovernedCollaboration": {
+                "type": "object",
+                "patternProperties": {
+                  "^.*$": {}
+                }
+              }
+            }
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RecipePublishInput": {
+        "type": "object",
+        "properties": {
+          "audienceScope": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "private"
+              },
+              {
+                "type": "string",
+                "const": "role_restricted"
+              },
+              {
+                "type": "string",
+                "const": "workspace"
+              }
+            ]
+          },
+          "changeDescription": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
           }
         },
         "additionalProperties": false

@@ -27,6 +27,13 @@ import {
   getConnectionMappings,
   createSchemaMapping,
   approveSchemaMapping,
+  reviewRecipe,
+  publishRecipe,
+  retireRecipe,
+  getAuditEvents,
+  getAuditExportUrl,
+  getGovernanceReviews,
+  getGovernanceReadiness,
   type ConnectionInput,
 } from "../src/lib/api-client";
 
@@ -620,4 +627,175 @@ it("fetches drift diff, impact preview, and manages schema mappings", async () =
   const approved = await approveSchemaMapping("conn-1", "map-2");
   expect(approved.id).toBe("map-2");
   expect(approved.status).toBe("approved");
+});
+
+it("supports recipe lifecycle transitions, audit logging, review tasks, and readiness manifest", async () => {
+  const fetchMock = vi
+    .fn()
+    .mockResolvedValueOnce(
+      Response.json({
+        id: "recipe-1",
+        workspaceId: "ws-1",
+        name: "Enrolment Trend",
+        metricName: "trend",
+        version: 1,
+        ownerSubject: "analyst-1",
+        connectionId: "conn-1",
+        question: "trend?",
+        plan: {},
+        sqlText: "SELECT 1",
+        grain: ["school_id"],
+        timeframePolicy: "calendar",
+        nullExclusionPolicy: "exclude",
+        approvalStatus: "reviewed",
+        reviewedBy: "steward-1",
+        reviewedAt: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+      }),
+    )
+    .mockResolvedValueOnce(
+      Response.json({
+        id: "recipe-1",
+        workspaceId: "ws-1",
+        name: "Enrolment Trend",
+        metricName: "trend",
+        version: 2,
+        ownerSubject: "analyst-1",
+        connectionId: "conn-1",
+        question: "trend?",
+        plan: {},
+        sqlText: "SELECT 1",
+        grain: ["school_id"],
+        timeframePolicy: "calendar",
+        nullExclusionPolicy: "exclude",
+        approvalStatus: "published",
+        audienceScope: "workspace",
+        publishedBy: "publisher-1",
+        publishedAt: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+      }),
+    )
+    .mockResolvedValueOnce(
+      Response.json({
+        id: "recipe-1",
+        workspaceId: "ws-1",
+        name: "Enrolment Trend",
+        metricName: "trend",
+        version: 2,
+        ownerSubject: "analyst-1",
+        connectionId: "conn-1",
+        question: "trend?",
+        plan: {},
+        sqlText: "SELECT 1",
+        grain: ["school_id"],
+        timeframePolicy: "calendar",
+        nullExclusionPolicy: "exclude",
+        approvalStatus: "retired",
+        retiredBy: "steward-1",
+        retiredAt: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+      }),
+    )
+    .mockResolvedValueOnce(
+      Response.json({
+        events: [
+          {
+            id: "evt-1",
+            workspaceId: "ws-1",
+            category: "recipe_lifecycle",
+            action: "recipe_published",
+            actorSubject: "publisher-1",
+            actorRole: "owner",
+            resourceId: "recipe-1",
+            requestId: "req-1",
+            details: { name: "Enrolment Trend" },
+            occurredAt: new Date().toISOString(),
+            tamperEvidenceHash: "sha256-hash-1234567890abcdef1234567890abcdef",
+          },
+        ],
+        total: 1,
+        limit: 50,
+        offset: 0,
+      }),
+    )
+    .mockResolvedValueOnce(
+      Response.json({
+        tasks: [
+          {
+            id: "task-1",
+            taskType: "recipe_publication",
+            title: "Review Recipe",
+            description: "Recipe requires approval",
+            resourceId: "recipe-1",
+            requestedBy: "analyst-1",
+            requestedAt: new Date().toISOString(),
+            status: "pending",
+          },
+        ],
+        pendingCount: 1,
+      }),
+    )
+    .mockResolvedValueOnce(
+      Response.json({
+        candidateVersion: "1.0.0-rc1",
+        status: "ready_for_release",
+        releaseManifest: {
+          candidateVersion: "1.0.0-rc1",
+          modelArtifacts: { "gpt-4o": "sha256:123" },
+          promptTemplates: { intent: "sha256:456" },
+          policyEngine: { version: "2026.10.24" },
+          runtimeEnvironment: { node: "v20" },
+          measuredLimits: { maxTimeoutMs: 15000 },
+          reviewerSignOffs: { securityLead: "approved" },
+          recoveryInstructions: "Rollback instructions",
+        },
+        requirementCoverage: [
+          {
+            requirementId: "E11",
+            title: "Governed collaboration",
+            status: "passed",
+            owner: "Product Lead",
+            verifiedGate: "G9",
+          },
+        ],
+        gateMetrics: {
+          g6OrganizationPermissions: { attackPassRate: 1.0 },
+          g7ConversationalFollowUps: { clarificationPrecision: 1.0 },
+          g8SchemaEvolutionRecovery: { conditionBAccuracy: 1.0 },
+          g9GovernedCollaboration: { tamperEvidenceChaining: true },
+        },
+        generatedAt: new Date().toISOString(),
+      }),
+    );
+
+  vi.stubGlobal("fetch", fetchMock);
+
+  const reviewed = await reviewRecipe("recipe-1");
+  expect(reviewed.approvalStatus).toBe("reviewed");
+
+  const published = await publishRecipe("recipe-1", {
+    audienceScope: "workspace",
+    changeDescription: "Organization publication",
+  });
+  expect(published.approvalStatus).toBe("published");
+  expect(published.version).toBe(2);
+
+  const retired = await retireRecipe("recipe-1");
+  expect(retired.approvalStatus).toBe("retired");
+
+  const audit = await getAuditEvents({ category: "recipe_lifecycle" });
+  expect(audit.events).toHaveLength(1);
+  expect(audit.events[0].action).toBe("recipe_published");
+
+  expect(getAuditExportUrl("csv")).toBe(
+    "/api/backend/v1/audit/export?format=csv",
+  );
+
+  const reviews = await getGovernanceReviews();
+  expect(reviews.tasks).toHaveLength(1);
+  expect(reviews.pendingCount).toBe(1);
+
+  const readiness = await getGovernanceReadiness();
+  expect(readiness.status).toBe("ready_for_release");
+  expect(readiness.candidateVersion).toBe("1.0.0-rc1");
 });

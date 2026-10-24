@@ -30,6 +30,15 @@ export type SchemaMappingRequest =
   components["schemas"]["SchemaMappingRequest"];
 export type ImpactPreviewResponse =
   components["schemas"]["ImpactPreviewResponse"];
+export type AuditEvent = components["schemas"]["AuditEvent"];
+export type AuditListResponse = components["schemas"]["AuditListResponse"];
+export type GovernanceReviewTask =
+  components["schemas"]["GovernanceReviewTask"];
+export type GovernanceReviewsResponse =
+  components["schemas"]["GovernanceReviewsResponse"];
+export type GovernanceReadinessResponse =
+  components["schemas"]["GovernanceReadinessResponse"];
+export type RecipePublishInput = components["schemas"]["RecipePublishInput"];
 
 function resolveUrl(path: string, baseUrl?: string): string {
   if (baseUrl) {
@@ -316,4 +325,51 @@ export async function approveSchemaMapping(
       method: "POST",
     },
   );
+}
+
+export async function reviewRecipe(recipeId: string): Promise<Recipe> {
+  return fetchJson<Recipe>(`/v1/recipes/${recipeId}/review`, {
+    method: "POST",
+  });
+}
+
+export async function publishRecipe(
+  recipeId: string,
+  input?: RecipePublishInput,
+): Promise<Recipe> {
+  return fetchJson<Recipe>(`/v1/recipes/${recipeId}/publish`, {
+    method: "POST",
+    body: input ? JSON.stringify(input) : undefined,
+  });
+}
+
+export async function retireRecipe(recipeId: string): Promise<Recipe> {
+  return fetchJson<Recipe>(`/v1/recipes/${recipeId}/retire`, {
+    method: "POST",
+  });
+}
+
+export async function getAuditEvents(query?: {
+  category?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<AuditListResponse> {
+  const params = new URLSearchParams();
+  if (query?.category) params.set("category", query.category);
+  if (query?.limit !== undefined) params.set("limit", String(query.limit));
+  if (query?.offset !== undefined) params.set("offset", String(query.offset));
+  const queryString = params.toString() ? `?${params.toString()}` : "";
+  return fetchJson<AuditListResponse>(`/v1/audit/events${queryString}`);
+}
+
+export function getAuditExportUrl(format: "json" | "csv" = "json"): string {
+  return `/api/backend/v1/audit/export?format=${format}`;
+}
+
+export async function getGovernanceReviews(): Promise<GovernanceReviewsResponse> {
+  return fetchJson<GovernanceReviewsResponse>("/v1/governance/reviews");
+}
+
+export async function getGovernanceReadiness(): Promise<GovernanceReadinessResponse> {
+  return fetchJson<GovernanceReadinessResponse>("/v1/governance/readiness");
 }

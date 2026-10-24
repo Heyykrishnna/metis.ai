@@ -191,11 +191,23 @@ export const RecipeInputSchema = Type.Object(
     grain: Type.Array(TextSchema, { minItems: 1, maxItems: 20 }),
     timeframePolicy: TextSchema,
     nullExclusionPolicy: TextSchema,
-    approvalStatus: Type.Union([
-      Type.Literal("draft"),
-      Type.Literal("approved"),
-      Type.Literal("archived"),
-    ]),
+    approvalStatus: Type.Optional(
+      Type.Union([
+        Type.Literal("draft"),
+        Type.Literal("reviewed"),
+        Type.Literal("published"),
+        Type.Literal("retired"),
+        Type.Literal("approved"),
+        Type.Literal("archived"),
+      ]),
+    ),
+    audienceScope: Type.Optional(
+      Type.Union([
+        Type.Literal("private"),
+        Type.Literal("role_restricted"),
+        Type.Literal("workspace"),
+      ]),
+    ),
   },
   { additionalProperties: false },
 );
@@ -217,9 +229,37 @@ export const RecipeSchema = Type.Object(
     nullExclusionPolicy: TextSchema,
     approvalStatus: Type.Union([
       Type.Literal("draft"),
+      Type.Literal("reviewed"),
+      Type.Literal("published"),
+      Type.Literal("retired"),
       Type.Literal("approved"),
       Type.Literal("archived"),
     ]),
+    audienceScope: Type.Optional(
+      Type.Union([
+        Type.Literal("private"),
+        Type.Literal("role_restricted"),
+        Type.Literal("workspace"),
+      ]),
+    ),
+    reviewedBy: Type.Optional(TextSchema),
+    reviewedAt: Type.Optional(TimestampSchema),
+    publishedBy: Type.Optional(TextSchema),
+    publishedAt: Type.Optional(TimestampSchema),
+    retiredBy: Type.Optional(TextSchema),
+    retiredAt: Type.Optional(TimestampSchema),
+    versionHistory: Type.Optional(
+      Type.Array(
+        Type.Object({
+          version: Type.Integer({ minimum: 1 }),
+          changeDescription: TextSchema,
+          updatedBy: TextSchema,
+          updatedAt: TimestampSchema,
+        }),
+      ),
+    ),
+    policyVersion: Type.Optional(TextSchema),
+    snapshotHash: Type.Optional(TextSchema),
     createdAt: TimestampSchema,
   },
   { additionalProperties: false },

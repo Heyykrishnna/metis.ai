@@ -13,6 +13,7 @@ import { logger } from "./logger.js";
 import { analysisRoutes } from "./routes/analyses.js";
 import { connectionRoutes } from "./routes/connections.js";
 import { feedbackRoutes } from "./routes/feedback.js";
+import { governanceRoutes } from "./routes/governance.js";
 import { healthRoutes } from "./routes/health.js";
 import { policyRoutes } from "./routes/policies.js";
 import { recipeRoutes } from "./routes/recipes.js";
@@ -152,6 +153,7 @@ export async function buildApp(
   await app.register(feedbackRoutes);
   await app.register(recipeRoutes);
   await app.register(policyRoutes);
+  await app.register(governanceRoutes);
 
   return app;
 }

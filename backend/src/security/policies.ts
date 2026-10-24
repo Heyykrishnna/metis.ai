@@ -470,6 +470,10 @@ export function restoreSubjectAccess(subject: string): void {
   revokedSubjects.delete(subject);
 }
 
+export function resetRevocations(): void {
+  revokedSubjects.clear();
+}
+
 export function isSubjectRevoked(subject: string): boolean {
   return revokedSubjects.has(subject);
 }

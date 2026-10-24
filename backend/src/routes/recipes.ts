@@ -9,10 +9,15 @@ import {
   RecipeSchema,
   type Recipe,
 } from "../contracts/features.js";
+import {
+  RecipePublishInputSchema,
+  type RecipePublishInput,
+} from "../contracts/governance.js";
 import { metricDefinitions } from "../db/schema.js";
 import { requireAuth } from "../security/auth.js";
 import { validateQuerySafety } from "../sql/safety.js";
 import { getMemoryConnection } from "./connections.js";
+import { recordAuditEvent } from "../analysis/governance.js";
 
 const memoryRecipes = new Map<string, Recipe>();
 
@@ -33,6 +38,10 @@ export function invalidateRecipeDueToDrift(recipeId: string): boolean {
     return true;
   }
   return false;
+}
+
+export function clearMemoryRecipes(): void {
+  memoryRecipes.clear();
 }
 
 const recipeParamsSchema = Type.Object(
@@ -67,13 +76,15 @@ export const recipeRoutes: FastifyPluginAsyncTypebox = async (app) => {
         grain,
         timeframePolicy,
         nullExclusionPolicy,
-        approvalStatus,
+        approvalStatus = "draft",
+        audienceScope = "workspace",
       } = request.body;
 
       const workspaceId =
         request.authContext?.workspaceId ??
         "00000000-0000-4000-8000-000000000001";
       const subject = request.authContext?.subject ?? "unknown-actor";
+      const role = request.authContext?.role ?? "owner";
       const recipeId = randomUUID();
       const now = new Date().toISOString();
 
@@ -92,10 +103,35 @@ export const recipeRoutes: FastifyPluginAsyncTypebox = async (app) => {
         timeframePolicy,
         nullExclusionPolicy,
         approvalStatus,
+        audienceScope,
+        versionHistory: [
+          {
+            version: 1,
+            changeDescription: "Initial creation",
+            updatedBy: subject,
+            updatedAt: now,
+          },
+        ],
         createdAt: now,
       };
 
       memoryRecipes.set(recipeId, recipe);
+
+      recordAuditEvent({
+        workspaceId,
+        category: "recipe_lifecycle",
+        action: "recipe_created",
+        actorSubject: subject,
+        actorRole: role,
+        resourceId: recipeId,
+        requestId: request.id ?? `req-${recipeId}`,
+        details: {
+          name,
+          metricName,
+          audienceScope,
+          approvalStatus,
+        },
+      });
 
       if (app.metadataDb) {
         try {
@@ -114,10 +150,15 @@ export const recipeRoutes: FastifyPluginAsyncTypebox = async (app) => {
               grain,
               timeframePolicy,
               nullExclusionPolicy,
+              audienceScope,
               createdAt: now,
             },
             approvalStatus:
-              approvalStatus === "archived" ? "revoked" : approvalStatus,
+              approvalStatus === "archived" || approvalStatus === "retired"
+                ? "revoked"
+                : approvalStatus === "draft"
+                  ? "draft"
+                  : "approved",
           });
         } catch {
           void 0;
@@ -141,6 +182,17 @@ export const recipeRoutes: FastifyPluginAsyncTypebox = async (app) => {
       const workspaceId =
         request.authContext?.workspaceId ??
         "00000000-0000-4000-8000-000000000001";
+
+      const list: Recipe[] = [];
+      for (const recipe of memoryRecipes.values()) {
+        if (recipe.workspaceId === workspaceId) {
+          list.push(recipe);
+        }
+      }
+
+      if (list.length > 0) {
+        return list;
+      }
 
       if (app.metadataDb) {
         try {
@@ -181,12 +233,6 @@ export const recipeRoutes: FastifyPluginAsyncTypebox = async (app) => {
         }
       }
 
-      const list: Recipe[] = [];
-      for (const recipe of memoryRecipes.values()) {
-        if (recipe.workspaceId === workspaceId) {
-          list.push(recipe);
-        }
-      }
       return list;
     },
   );
@@ -208,6 +254,11 @@ export const recipeRoutes: FastifyPluginAsyncTypebox = async (app) => {
         request.authContext?.workspaceId ??
         "00000000-0000-4000-8000-000000000001";
       const requestId = request.id ?? "req-unknown";
+
+      const recipe = memoryRecipes.get(recipeId);
+      if (recipe && recipe.workspaceId === workspaceId) {
+        return reply.send(recipe);
+      }
 
       if (app.metadataDb) {
         try {
@@ -251,16 +302,212 @@ export const recipeRoutes: FastifyPluginAsyncTypebox = async (app) => {
         }
       }
 
-      const recipe = memoryRecipes.get(recipeId);
-      if (recipe && recipe.workspaceId === workspaceId) {
-        return reply.send(recipe);
-      }
-
       return reply.status(404).send({
         code: "not_found",
         message: "Resource unavailable",
         requestId,
       });
+    },
+  );
+
+  app.post(
+    "/v1/recipes/:recipeId/review",
+    {
+      schema: {
+        params: recipeParamsSchema,
+        response: {
+          200: RecipeSchema,
+          403: ErrorSchema,
+          404: ErrorSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const { recipeId } = request.params as { recipeId: string };
+      const workspaceId =
+        request.authContext?.workspaceId ??
+        "00000000-0000-4000-8000-000000000001";
+      const requestId = request.id ?? "req-unknown";
+      const role = request.authContext?.role ?? "owner";
+      const subject = request.authContext?.subject ?? "steward";
+
+      if (role === "viewer") {
+        return reply.status(403).send({
+          code: "forbidden",
+          message: "Viewers cannot review recipes",
+          requestId,
+        });
+      }
+
+      const recipe = memoryRecipes.get(recipeId);
+      if (!recipe || recipe.workspaceId !== workspaceId) {
+        return reply.status(404).send({
+          code: "not_found",
+          message: "Recipe not found",
+          requestId,
+        });
+      }
+
+      const now = new Date().toISOString();
+      recipe.approvalStatus = "reviewed";
+      recipe.reviewedBy = subject;
+      recipe.reviewedAt = now;
+
+      recordAuditEvent({
+        workspaceId,
+        category: "recipe_lifecycle",
+        action: "recipe_reviewed",
+        actorSubject: subject,
+        actorRole: role,
+        resourceId: recipeId,
+        requestId,
+        details: {
+          recipeName: recipe.name,
+          reviewedBy: subject,
+        },
+      });
+
+      return reply.send(recipe);
+    },
+  );
+
+  app.post(
+    "/v1/recipes/:recipeId/publish",
+    {
+      schema: {
+        params: recipeParamsSchema,
+        body: RecipePublishInputSchema,
+        response: {
+          200: RecipeSchema,
+          403: ErrorSchema,
+          404: ErrorSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const { recipeId } = request.params as { recipeId: string };
+      const body = request.body as RecipePublishInput;
+      const workspaceId =
+        request.authContext?.workspaceId ??
+        "00000000-0000-4000-8000-000000000001";
+      const requestId = request.id ?? "req-unknown";
+      const role = request.authContext?.role ?? "owner";
+      const subject = request.authContext?.subject ?? "publisher";
+
+      if (role === "viewer") {
+        return reply.status(403).send({
+          code: "forbidden",
+          message: "Viewers cannot publish recipes",
+          requestId,
+        });
+      }
+
+      const recipe = memoryRecipes.get(recipeId);
+      if (!recipe || recipe.workspaceId !== workspaceId) {
+        return reply.status(404).send({
+          code: "not_found",
+          message: "Recipe not found",
+          requestId,
+        });
+      }
+
+      const now = new Date().toISOString();
+      recipe.approvalStatus = "published";
+      recipe.publishedBy = subject;
+      recipe.publishedAt = now;
+      if (body.audienceScope) {
+        recipe.audienceScope = body.audienceScope;
+      }
+      recipe.version += 1;
+
+      const history = recipe.versionHistory ?? [];
+      history.push({
+        version: recipe.version,
+        changeDescription:
+          body.changeDescription ?? "Published recipe for organization use",
+        updatedBy: subject,
+        updatedAt: now,
+      });
+      recipe.versionHistory = history;
+
+      recordAuditEvent({
+        workspaceId,
+        category: "recipe_lifecycle",
+        action: "recipe_published",
+        actorSubject: subject,
+        actorRole: role,
+        resourceId: recipeId,
+        requestId,
+        details: {
+          recipeName: recipe.name,
+          version: recipe.version,
+          audienceScope: recipe.audienceScope,
+          publishedBy: subject,
+        },
+      });
+
+      return reply.send(recipe);
+    },
+  );
+
+  app.post(
+    "/v1/recipes/:recipeId/retire",
+    {
+      schema: {
+        params: recipeParamsSchema,
+        response: {
+          200: RecipeSchema,
+          403: ErrorSchema,
+          404: ErrorSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const { recipeId } = request.params as { recipeId: string };
+      const workspaceId =
+        request.authContext?.workspaceId ??
+        "00000000-0000-4000-8000-000000000001";
+      const requestId = request.id ?? "req-unknown";
+      const role = request.authContext?.role ?? "owner";
+      const subject = request.authContext?.subject ?? "steward";
+
+      if (role === "viewer") {
+        return reply.status(403).send({
+          code: "forbidden",
+          message: "Viewers cannot retire recipes",
+          requestId,
+        });
+      }
+
+      const recipe = memoryRecipes.get(recipeId);
+      if (!recipe || recipe.workspaceId !== workspaceId) {
+        return reply.status(404).send({
+          code: "not_found",
+          message: "Recipe not found",
+          requestId,
+        });
+      }
+
+      const now = new Date().toISOString();
+      recipe.approvalStatus = "retired";
+      recipe.retiredBy = subject;
+      recipe.retiredAt = now;
+
+      recordAuditEvent({
+        workspaceId,
+        category: "recipe_lifecycle",
+        action: "recipe_retired",
+        actorSubject: subject,
+        actorRole: role,
+        resourceId: recipeId,
+        requestId,
+        details: {
+          recipeName: recipe.name,
+          retiredBy: subject,
+        },
+      });
+
+      return reply.send(recipe);
     },
   );
 
@@ -283,6 +530,8 @@ export const recipeRoutes: FastifyPluginAsyncTypebox = async (app) => {
         request.authContext?.workspaceId ??
         "00000000-0000-4000-8000-000000000001";
       const requestId = request.id ?? "req-unknown";
+      const subject = request.authContext?.subject ?? "unknown-actor";
+      const role = request.authContext?.role ?? "owner";
 
       let recipe = memoryRecipes.get(recipeId);
       if (app.metadataDb && (!recipe || recipe.workspaceId !== workspaceId)) {
@@ -319,6 +568,9 @@ export const recipeRoutes: FastifyPluginAsyncTypebox = async (app) => {
                 r.approvalStatus === "revoked"
                   ? "archived"
                   : (r.approvalStatus as "draft" | "approved"),
+              audienceScope:
+                (def.audienceScope as
+                  "private" | "role_restricted" | "workspace") ?? "workspace",
               createdAt: String(def.createdAt ?? new Date().toISOString()),
             };
           }
@@ -335,20 +587,106 @@ export const recipeRoutes: FastifyPluginAsyncTypebox = async (app) => {
         });
       }
 
+      if (
+        recipe.approvalStatus === "retired" ||
+        recipe.approvalStatus === "archived"
+      ) {
+        recordAuditEvent({
+          workspaceId,
+          category: "denied_attempt",
+          action: "recipe_execution_retired",
+          actorSubject: subject,
+          actorRole: role,
+          resourceId: recipeId,
+          requestId,
+          details: {
+            recipeId,
+            status: recipe.approvalStatus,
+          },
+        });
+        return reply.status(400).send({
+          code: "invalid_request",
+          message: "Recipe has been retired and cannot be executed",
+          requestId,
+        });
+      }
+
+      if (
+        recipe.audienceScope === "private" &&
+        recipe.ownerSubject !== subject &&
+        role !== "owner"
+      ) {
+        recordAuditEvent({
+          workspaceId,
+          category: "denied_attempt",
+          action: "recipe_execution_private",
+          actorSubject: subject,
+          actorRole: role,
+          resourceId: recipeId,
+          requestId,
+          details: {
+            recipeId,
+            ownerSubject: recipe.ownerSubject,
+          },
+        });
+        return reply.status(403).send({
+          code: "forbidden",
+          message: "Recipe is private to author",
+          requestId,
+        });
+      }
+
+      if (recipe.audienceScope === "role_restricted" && role === "viewer") {
+        recordAuditEvent({
+          workspaceId,
+          category: "denied_attempt",
+          action: "recipe_execution_role_restricted",
+          actorSubject: subject,
+          actorRole: role,
+          resourceId: recipeId,
+          requestId,
+          details: {
+            recipeId,
+            audienceScope: recipe.audienceScope,
+          },
+        });
+        return reply.status(403).send({
+          code: "forbidden",
+          message: "Recipe is restricted to authorized analyst or owner roles",
+          requestId,
+        });
+      }
+
+      if (
+        role === "viewer" &&
+        recipe.approvalStatus !== "approved" &&
+        recipe.approvalStatus !== "published"
+      ) {
+        recordAuditEvent({
+          workspaceId,
+          category: "denied_attempt",
+          action: "recipe_execution_unapproved",
+          actorSubject: subject,
+          actorRole: role,
+          resourceId: recipeId,
+          requestId,
+          details: {
+            recipeId,
+            approvalStatus: recipe.approvalStatus,
+          },
+        });
+        return reply.status(403).send({
+          code: "forbidden",
+          message: "Viewers can only execute approved or published recipes",
+          requestId,
+        });
+      }
+
       const connection = getMemoryConnection(recipe.connectionId, workspaceId);
       if (!connection || connection.status === "revoked") {
         return reply.status(404).send({
           code: "not_found",
           message: "Target connection not found or revoked",
-          requestId,
-        });
-      }
-
-      const role = request.authContext?.role ?? "owner";
-      if (role === "viewer" && recipe.approvalStatus !== "approved") {
-        return reply.status(403).send({
-          code: "forbidden",
-          message: "Viewers can only execute approved recipes",
           requestId,
         });
       }
@@ -373,8 +711,23 @@ export const recipeRoutes: FastifyPluginAsyncTypebox = async (app) => {
           question: recipe.question,
           sqlOverride: recipe.sqlText,
           role,
-          actorSubject: request.authContext?.subject,
+          actorSubject: subject,
           isRecipe: true,
+        });
+
+        recordAuditEvent({
+          workspaceId,
+          category: "recipe_lifecycle",
+          action: "recipe_executed",
+          actorSubject: subject,
+          actorRole: role,
+          resourceId: recipeId,
+          requestId,
+          runId: run.runId,
+          details: {
+            recipeId,
+            runStatus: run.status,
+          },
         });
 
         return reply.status(202).send({
