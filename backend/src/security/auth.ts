@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { and, eq } from "drizzle-orm";
 import { memberships, workspaces } from "../db/schema.js";
@@ -57,11 +58,35 @@ export async function requireAuth(
     return;
   }
 
+  const localToken = process.env.METIS_LOCAL_TOKEN;
+  let verifiedLocal = false;
+  if (process.env.NODE_ENV !== "test") {
+    const supplied = Buffer.from(token);
+    const expected = Buffer.from(localToken ?? "");
+    verifiedLocal =
+      expected.length > 0 &&
+      supplied.length === expected.length &&
+      timingSafeEqual(supplied, expected);
+    if (!verifiedLocal) {
+      await reply.status(401).send({
+        code: "unauthorized",
+        message: "A configured local workspace credential is required.",
+        requestId,
+      });
+      return;
+    }
+  }
   const {
     subject,
     workspaceId: tokenWorkspaceId,
     role: tokenRole,
-  } = parseTokenPayload(token);
+  } = verifiedLocal
+    ? {
+        subject: "local-workspace-owner",
+        workspaceId: "00000000-0000-4000-8000-000000000001",
+        role: "owner" as const,
+      }
+    : parseTokenPayload(token);
   const requestedWorkspaceId =
     (request.headers["x-workspace-id"] as string | undefined) ??
     tokenWorkspaceId;

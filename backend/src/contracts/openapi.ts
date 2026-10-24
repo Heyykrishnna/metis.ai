@@ -43,8 +43,29 @@ import {
   SchemaMappingRequestSchema,
   SchemaMappingSchema,
 } from "./drift.js";
+import {
+  AuditEventSchema,
+  AuditListResponseSchema,
+  GovernanceReadinessResponseSchema,
+  GovernanceReviewsResponseSchema,
+  GovernanceReviewTaskSchema,
+  RecipePublishInputSchema,
+} from "./governance.js";
+
+import {
+  FileAnalysisSchema,
+  FilePreviewSchema,
+  FileQuestionSchema,
+  FileUploadSchema,
+  StoredFileSchema,
+} from "./files.js";
 
 const apiSchemas = {
+  StoredFile: StoredFileSchema,
+  FileUpload: FileUploadSchema,
+  FilePreview: FilePreviewSchema,
+  FileQuestion: FileQuestionSchema,
+  FileAnalysis: FileAnalysisSchema,
   QuestionIntent: QuestionIntentSchema,
   SchemaEvidence: SchemaEvidenceSchema,
   AnalyticalPlan: AnalyticalPlanSchema,
@@ -87,6 +108,12 @@ const apiSchemas = {
   SchemaMapping: SchemaMappingSchema,
   SchemaMappings: Type.Array(SchemaMappingSchema, { maxItems: 100 }),
   ImpactPreviewResponse: ImpactPreviewResponseSchema,
+  AuditEvent: AuditEventSchema,
+  AuditListResponse: AuditListResponseSchema,
+  GovernanceReviewTask: GovernanceReviewTaskSchema,
+  GovernanceReviewsResponse: GovernanceReviewsResponseSchema,
+  GovernanceReadinessResponse: GovernanceReadinessResponseSchema,
+  RecipePublishInput: RecipePublishInputSchema,
 };
 function ref(name: keyof typeof apiSchemas) {
   return Type.Ref(`#/components/schemas/${name}`);
@@ -104,7 +131,7 @@ function operation(
 ) {
   return {
     operationId,
-    "x-implementation-status": "planned",
+    "x-implementation-status": "implemented",
     security: [{ bearerAuth: [] }],
     ...(body === undefined
       ? {}
@@ -135,9 +162,68 @@ export const openApiDocument = {
     title: "metis.ai API",
     version: "0.1.0",
     description:
-      "Phase 0 contracts. Only /health is implemented. Operations labelled planned are specifications, not available product routes.",
+      "Local workspace API. Stored-file analysis uses Neon persistence, Brotli compression and bounded local inference. External SQL analysis requires a configured read-only analytical adapter.",
   },
   paths: {
+    "/v1/capabilities": {
+      get: operation(
+        "getCapabilities",
+        Type.Object(
+          {
+            storageAvailable: Type.Boolean(),
+            analysisAvailable: Type.Boolean(),
+            inferenceAvailable: Type.Boolean(),
+            model: Type.String(),
+          },
+          { additionalProperties: false },
+        ),
+      ),
+    },
+    "/v1/files": {
+      get: operation("listFiles", Type.Array(ref("StoredFile"))),
+      post: operation(
+        "uploadFile",
+        ref("FilePreview"),
+        ref("FileUpload"),
+        "201",
+      ),
+    },
+    "/v1/files/{fileId}": {
+      parameters: [
+        { name: "fileId", in: "path", required: true, schema: IdSchema },
+      ],
+      get: operation("previewFile", ref("FilePreview")),
+      delete: operation("deleteFile", Type.Object({ deleted: Type.Boolean() })),
+    },
+    "/v1/files/{fileId}/content": {
+      parameters: [
+        { name: "fileId", in: "path", required: true, schema: IdSchema },
+      ],
+      get: {
+        ...operation("downloadFile", Type.String()),
+        responses: {
+          ...operation("downloadFile", Type.String()).responses,
+          "200": {
+            description:
+              "Original file bytes, verified after Brotli decompression",
+            content: {
+              "application/octet-stream": {
+                schema: { type: "string", format: "binary" },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/v1/files/{fileId}/analyses": {
+      parameters: [
+        { name: "fileId", in: "path", required: true, schema: IdSchema },
+      ],
+      post: operation("analyzeFile", ref("FileAnalysis"), ref("FileQuestion")),
+    },
+    "/v1/file-analyses": {
+      get: operation("listFileAnalyses", Type.Array(ref("FileAnalysis"))),
+    },
     "/health": {
       get: {
         operationId: "getHealth",
@@ -254,7 +340,7 @@ export const openApiDocument = {
       parameters: runParameters,
       get: {
         operationId: "exportRunCsv",
-        "x-implementation-status": "planned",
+        "x-implementation-status": "implemented",
         security: [{ bearerAuth: [] }],
         responses: {
           "200": {
@@ -271,7 +357,7 @@ export const openApiDocument = {
       parameters: runParameters,
       get: {
         operationId: "exportRunSql",
-        "x-implementation-status": "planned",
+        "x-implementation-status": "implemented",
         security: [{ bearerAuth: [] }],
         responses: {
           "200": {
@@ -326,6 +412,59 @@ export const openApiDocument = {
         ref("RecipeExecuteResponse"),
         undefined,
         "202",
+      ),
+    },
+    "/v1/recipes/{recipeId}/review": {
+      parameters: [
+        { name: "recipeId", in: "path", required: true, schema: IdSchema },
+      ],
+      post: operation("reviewRecipe", ref("Recipe")),
+    },
+    "/v1/recipes/{recipeId}/publish": {
+      parameters: [
+        { name: "recipeId", in: "path", required: true, schema: IdSchema },
+      ],
+      post: operation(
+        "publishRecipe",
+        ref("Recipe"),
+        ref("RecipePublishInput"),
+      ),
+    },
+    "/v1/recipes/{recipeId}/retire": {
+      parameters: [
+        { name: "recipeId", in: "path", required: true, schema: IdSchema },
+      ],
+      post: operation("retireRecipe", ref("Recipe")),
+    },
+    "/v1/audit/events": {
+      get: operation("listAuditEvents", ref("AuditListResponse")),
+    },
+    "/v1/audit/export": {
+      get: {
+        operationId: "exportAuditEvents",
+        "x-implementation-status": "implemented",
+        security: [{ bearerAuth: [] }],
+        responses: {
+          "200": {
+            description: "Safe audit log export in JSON or CSV",
+            content: {
+              "application/json": { schema: Type.String() },
+              "text/csv": { schema: Type.String() },
+            },
+          },
+          "401": response(ref("Error"), "Authentication required"),
+          "403": response(ref("Error"), "Access denied"),
+          "404": response(ref("Error"), "Resource unavailable"),
+        },
+      },
+    },
+    "/v1/governance/reviews": {
+      get: operation("getGovernanceReviews", ref("GovernanceReviewsResponse")),
+    },
+    "/v1/governance/readiness": {
+      get: operation(
+        "getGovernanceReadiness",
+        ref("GovernanceReadinessResponse"),
       ),
     },
     "/v1/policies/effective": {

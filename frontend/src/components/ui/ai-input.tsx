@@ -107,7 +107,7 @@ export function AIInput({
           <div className="prompt-tools">
             <span
               className="local-model"
-              title="Local Qwen2.5-Coder model is configured. Analysis API is not available yet."
+              title="Local Qwen2.5-Coder plans supported file questions; values are calculated from stored records."
             >
               <span className="model-mark">✳</span> Qwen 2.5{" "}
               <span className="model-local">Local</span>
@@ -130,7 +130,7 @@ export function AIInput({
         </span>
         <span>
           {sourceCount
-            ? `${sourceCount} local ${sourceCount === 1 ? "file" : "files"} available`
+            ? `${sourceCount} stored ${sourceCount === 1 ? "file" : "files"} available`
             : "Your data stays yours"}
         </span>
       </div>

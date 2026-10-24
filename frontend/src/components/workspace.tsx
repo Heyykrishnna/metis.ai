@@ -5,9 +5,16 @@ import Link from "next/link";
 import {
   MAX_FILES,
   MAX_FILE_SIZE,
-  parseLocalDocument,
   type LocalDocument,
 } from "@/lib/local-files";
+import {
+  uploadFile,
+  loadFiles,
+  deleteFile,
+  analyzeFile,
+  fileHistory,
+  originalFileUrl,
+} from "@/lib/file-client";
 import { downloadText, type Question } from "@/lib/workspace";
 import {
   getConnections,
@@ -28,6 +35,7 @@ import {
   type Connection,
   type SchemaConstellation,
   type Recipe,
+  type Result,
 } from "@/lib/api-client";
 import { Dialog } from "./dialog";
 import {
@@ -94,6 +102,7 @@ export function Workspace() {
     "checking",
   );
   const [statusVersion, setStatusVersion] = useState(0);
+  const [inferenceAvailable, setInferenceAvailable] = useState(false);
 
   const [connections, setConnections] = useState<Connection[]>([]);
   const [activeConnectionId, setActiveConnectionId] = useState<string | null>(
@@ -139,7 +148,61 @@ export function Workspace() {
           "status" in body &&
           body.status === "online";
         setApiStatus(online ? "online" : "offline");
+        setInferenceAvailable(
+          online &&
+            typeof body === "object" &&
+            body !== null &&
+            "inferenceAvailable" in body &&
+            body.inferenceAvailable === true,
+        );
         if (online) {
+          Promise.all([loadFiles(), fileHistory()])
+            .then(([files, history]) => {
+              if (controller.signal.aborted) return;
+              setDocuments(files);
+              setSelectedId((current) =>
+                files.some((file) => file.id === current)
+                  ? current
+                  : (files[0]?.id ?? ""),
+              );
+              updateQuestions((current) => {
+                const fromServer = history.map((analysis): Question => {
+                  const previous = current.find(
+                    (item) => item.runId === analysis.id,
+                  );
+                  return {
+                    id: previous?.id ?? analysis.id,
+                    text: analysis.question,
+                    mode: previous?.mode ?? "Ask your data",
+                    source:
+                      files.find((file) => file.id === analysis.fileId)?.name ??
+                      "Stored file",
+                    fileId: analysis.fileId,
+                    runId: analysis.id,
+                    status: analysis.result.answer.status,
+                    result: analysis.result,
+                    fileAnalysis: analysis,
+                    createdAt: Date.parse(analysis.createdAt),
+                    saved: previous?.saved ?? false,
+                  };
+                });
+                const other = current.filter(
+                  (item) =>
+                    !history.some((analysis) => analysis.id === item.runId),
+                );
+                return [...fromServer, ...other].sort(
+                  (left, right) => right.createdAt - left.createdAt,
+                );
+              });
+            })
+            .catch((error: unknown) => {
+              if (!controller.signal.aborted)
+                setNotice(
+                  error instanceof Error
+                    ? error.message
+                    : "Stored files could not be loaded.",
+                );
+            });
           getConnections()
             .then((list) => {
               setConnections(list);
@@ -160,7 +223,7 @@ export function Workspace() {
         if (!controller.signal.aborted) setApiStatus("offline");
       });
     return () => controller.abort();
-  }, [statusVersion]);
+  }, [statusVersion, updateQuestions]);
 
   useEffect(() => {
     if (activeConnectionId && apiStatus === "online") {
@@ -223,7 +286,12 @@ export function Workspace() {
     ]);
 
     let activeRun = await getRun(runId);
+    const deadline = Date.now() + 120000;
     while (!terminalStatuses.has(activeRun.status)) {
+      if (Date.now() >= deadline)
+        throw new Error(
+          "Status checking timed out. Reopen this question to check its final outcome.",
+        );
       await new Promise((resolve) => setTimeout(resolve, 800));
       activeRun = await getRun(runId);
       updateQuestions((current) =>
@@ -236,6 +304,18 @@ export function Workspace() {
       );
     }
 
+    if (activeRun.status !== "answered") {
+      const result = await getRunResult(runId);
+      const fields = { status: activeRun.status, result };
+      updateQuestions((current) =>
+        current.map((item) =>
+          item.id === questionId ? { ...item, ...fields } : item,
+        ),
+      );
+      setQuestion((current) =>
+        current?.id === questionId ? { ...current, ...fields } : current,
+      );
+    }
     if (activeRun.status === "answered") {
       const [resResult, resEvidence, resLedger, resRadar, resCf, resPassport] =
         await Promise.allSettled([
@@ -319,6 +399,49 @@ export function Workspace() {
     }
   }
 
+  async function executeFileQuestion(id: string, fileId: string, text: string) {
+    try {
+      const analysis = await analyzeFile(fileId, text);
+      const fields = {
+        status: analysis.result.answer.status,
+        runId: analysis.id,
+        result: analysis.result,
+        fileAnalysis: analysis,
+      };
+      updateQuestions((current) =>
+        current.map((item) => (item.id === id ? { ...item, ...fields } : item)),
+      );
+      setQuestion((current) =>
+        current?.id === id ? { ...current, ...fields } : current,
+      );
+    } catch (error) {
+      const reason =
+        error instanceof Error
+          ? error.message
+          : "The file question could not be completed.";
+      setNotice(reason);
+      const result: Result = {
+        answer: {
+          runId: id,
+          status: "execution_failed",
+          reason,
+          nextAction: "Check service readiness and submit the question again.",
+          assumptions: [],
+          limitations: [],
+        },
+        columns: [],
+        rows: [],
+      };
+      const fields = { status: "execution_failed", result };
+      updateQuestions((current) =>
+        current.map((item) => (item.id === id ? { ...item, ...fields } : item)),
+      );
+      setQuestion((current) =>
+        current?.id === id ? { ...current, ...fields } : current,
+      );
+    }
+  }
+
   function submitQuestion() {
     if (!prompt.trim()) return;
     const userText = prompt.trim();
@@ -332,7 +455,8 @@ export function Workspace() {
       source,
       createdAt: Date.now(),
       saved: false,
-      status: canAnalyze ? "planning" : undefined,
+      status: canAnalyze || selectedDocument ? "planning" : undefined,
+      fileId: selectedDocument?.id,
       connectionId: canAnalyze ? activeConnectionId : undefined,
     };
 
@@ -349,7 +473,9 @@ export function Workspace() {
     setFeedbackRating(null);
     setFeedbackSubmitted(false);
 
-    if (canAnalyze && activeConnectionId) {
+    if (selectedDocument) {
+      void executeFileQuestion(draft.id, selectedDocument.id, userText);
+    } else if (canAnalyze && activeConnectionId) {
       void executeAnalysisRequest(draft.id, userText, activeConnectionId);
     }
   }
@@ -359,6 +485,18 @@ export function Workspace() {
     const input = clarificationText.trim();
     setClarificationText("");
     setSubmittingClarification(true);
+    if (question.fileId) {
+      try {
+        await executeFileQuestion(
+          question.id,
+          question.fileId,
+          `${question.text}\nClarification: ${input}`,
+        );
+      } finally {
+        setSubmittingClarification(false);
+      }
+      return;
+    }
     const connId = question.connectionId ?? activeConnectionId;
     if (!connId) {
       setNotice("No database connection available for clarification.");
@@ -484,7 +622,7 @@ export function Workspace() {
     for (const file of files) {
       if (documents.length + added.length >= MAX_FILES) {
         errors.push(
-          "Your session can hold 10 files. Remove a file before adding another.",
+          "Your workspace can store 10 files. Remove a file before adding another.",
         );
         break;
       }
@@ -502,15 +640,7 @@ export function Workspace() {
         continue;
       }
       try {
-        added.push(
-          parseLocalDocument(
-            file.name,
-            await file.text(),
-            file.size,
-            crypto.randomUUID(),
-            Date.now(),
-          ),
-        );
+        added.push(await uploadFile(file));
       } catch (error) {
         errors.push(
           error instanceof Error
@@ -526,16 +656,30 @@ export function Workspace() {
     readingRef.current = false;
     if (added.length)
       setNotice(
-        `${added.length} ${added.length === 1 ? "file is" : "files are"} ready to explore. Nothing was uploaded.`,
+        `${added.length} ${added.length === 1 ? "file is" : "files are"} compressed with Brotli and saved in Neon.`,
       );
   }
 
-  function removeFile(id: string) {
-    setDocuments((current) => current.filter((document) => document.id !== id));
-    if (selectedId === id) setSelectedId("");
-    setNotice(
-      "File removed from this session. Your original file is unchanged.",
-    );
+  async function removeFile(id: string) {
+    try {
+      await deleteFile(id);
+      setDocuments((current) =>
+        current.filter((document) => document.id !== id),
+      );
+      updateQuestions((current) =>
+        current.filter((item) => item.fileId !== id),
+      );
+      if (selectedId === id) setSelectedId("");
+      setNotice(
+        "Stored file and its analysis records removed. Your original file is unchanged.",
+      );
+    } catch (error) {
+      setNotice(
+        error instanceof Error
+          ? error.message
+          : "The file could not be removed.",
+      );
+    }
   }
 
   function openQuestion(item: Question) {
@@ -543,6 +687,12 @@ export function Workspace() {
     setQuestionTab("Overview");
     setView("All analyses");
     setModal(null);
+    if (item.runId && !item.fileId && !item.result)
+      void pollRunUntilTerminal(item.id, item.runId).catch(() =>
+        setNotice(
+          "The saved result could not be restored. Check the service status and retry.",
+        ),
+      );
   }
 
   const matchingQuestions = questions.filter(
@@ -554,15 +704,17 @@ export function Workspace() {
     item.name.toLowerCase().includes(filter.toLowerCase()),
   );
 
-  const availableTabs = [
-    "Overview",
-    "SQL",
-    "Results",
-    "Truth Ledger",
-    "Dirty Radar",
-    "Counterfactuals",
-    "Cost Passport",
-  ];
+  const availableTabs = question?.fileId
+    ? ["Overview", "Results", "Evidence"]
+    : [
+        "Overview",
+        "SQL",
+        "Results",
+        "Truth Ledger",
+        "Dirty Radar",
+        "Counterfactuals",
+        "Cost Passport",
+      ];
 
   return (
     <div className="workspace">
@@ -903,12 +1055,32 @@ export function Workspace() {
                           </div>
                         )}
 
+                        {question.fileAnalysis && (
+                          <div className="info-callout">
+                            <Icon name="file" />
+                            <p>
+                              Source hash:{" "}
+                              {question.fileAnalysis.sourceHash.slice(0, 16)}… ·{" "}
+                              {question.fileAnalysis.method} ·{" "}
+                              {question.fileAnalysis.modelVersion}.{" "}
+                              {question.fileAnalysis.method === "extractive"
+                                ? "Verified source excerpts from the bounded document context."
+                                : "Values are computed from the complete stored file."}
+                            </p>
+                          </div>
+                        )}
                         {question.result?.answer ? (
                           <div
                             className="claim-card"
                             style={{ margin: "16px 0", padding: 20 }}
                           >
-                            <span className="eyebrow">VERIFIED ANSWER</span>
+                            <span className="eyebrow">
+                              {question.result.answer.status !== "answered"
+                                ? "ANALYSIS STATUS"
+                                : question.fileAnalysis
+                                  ? "FILE-GROUNDED RESULT"
+                                  : "VERIFIED ANSWER"}
+                            </span>
                             <p
                               style={{
                                 font: "18px/1.6 Georgia, serif",
@@ -933,12 +1105,14 @@ export function Workspace() {
                           >
                             {question.status === "planning" ||
                             question.status === "executing"
-                              ? "Metis is inspecting the schema constellation, generating AST-verified SQL, and gathering evidence."
+                              ? question.fileId
+                                ? "Metis is reading the stored file and planning a validated calculation. Values are computed from the complete file."
+                                : "Metis is inspecting the schema, planning a read-only query, and gathering evidence."
                               : "This question has not executed against an active database connection. Select an active connection and submit to generate verified results."}
                           </EmptyState>
                         )}
 
-                        {question.runId && (
+                        {question.runId && !question.fileId && (
                           <div className="feedback-container">
                             <span style={{ fontSize: 12, color: "#4f6345" }}>
                               Rate analysis accuracy:
@@ -975,6 +1149,45 @@ export function Workspace() {
                       </div>
                     )}
 
+                    {questionTab === "Evidence" && question.fileAnalysis && (
+                      <section className="panel">
+                        <h2>Stored-file evidence</h2>
+                        <p className="muted">
+                          The original file is verified against its SHA-256 hash
+                          before analysis. Computations use all validated
+                          records; the table preview is bounded separately.
+                        </p>
+                        <dl className="file-evidence">
+                          <dt>Source hash</dt>
+                          <dd>{question.fileAnalysis.sourceHash}</dd>
+                          <dt>Method</dt>
+                          <dd>{question.fileAnalysis.method}</dd>
+                          <dt>Planner</dt>
+                          <dd>{question.fileAnalysis.modelVersion}</dd>
+                          <dt>Definition</dt>
+                          <dd>
+                            {question.fileAnalysis.result.answer.status ===
+                            "answered"
+                              ? question.fileAnalysis.result.answer.definition
+                              : question.fileAnalysis.result.answer.reason}
+                          </dd>
+                        </dl>
+                        {question.fileAnalysis.result.answer.assumptions.map(
+                          (assumption) => (
+                            <p className="fine-print" key={assumption}>
+                              {assumption}
+                            </p>
+                          ),
+                        )}
+                        {question.fileAnalysis.result.answer.limitations.map(
+                          (limitation) => (
+                            <p className="fine-print" key={limitation}>
+                              {limitation}
+                            </p>
+                          ),
+                        )}
+                      </section>
+                    )}
                     {questionTab === "SQL" && (
                       <div>
                         {question.evidence?.finalStatus === "answered" &&
@@ -1035,7 +1248,8 @@ export function Workspace() {
                                   handleCopySql(
                                     question.result?.answer.status ===
                                       "answered"
-                                      ? question.result.answer.sqlReference
+                                      ? (question.result.answer.sqlReference ??
+                                          "")
                                       : "",
                                   )
                                 }
@@ -1144,6 +1358,7 @@ export function Workspace() {
                         className="button"
                         onClick={() => {
                           setQuestion(null);
+                          if (question.fileId) setSelectedId(question.fileId);
                           applyTemplate(
                             question.text,
                             question.mode === "Verify a claim"
@@ -1158,7 +1373,29 @@ export function Workspace() {
                         <Icon name="arrow" size={15} />
                       </button>
 
-                      {question.runId ? (
+                      {question.fileAnalysis ? (
+                        <>
+                          <a
+                            className="button"
+                            href={originalFileUrl(question.fileAnalysis.fileId)}
+                          >
+                            <Icon name="download" size={15} />
+                            Download source
+                          </a>
+                          <button
+                            className="button"
+                            onClick={() =>
+                              downloadText(
+                                "metis-file-evidence.json",
+                                JSON.stringify(question.fileAnalysis, null, 2),
+                              )
+                            }
+                          >
+                            <Icon name="download" size={15} />
+                            Export answer & evidence
+                          </button>
+                        </>
+                      ) : question.runId ? (
                         <>
                           <a
                             className="button"
@@ -1313,7 +1550,7 @@ export function Workspace() {
                   <section className="panel">
                     <div className="section-heading">
                       <h2>
-                        Local files{" "}
+                        Stored files{" "}
                         <span className="count-pill">{documents.length}</span>
                       </h2>
                       <label className="inline-search">
@@ -1340,8 +1577,9 @@ export function Workspace() {
                           </EmptyState>
                         )}
                         <p className="fine-print">
-                          Files stay in memory for this session. Refreshing the
-                          page removes them.
+                          Originals are compressed with Brotli in Neon and
+                          restored after refresh. Previews show at most 100
+                          rows.
                         </p>
                       </>
                     ) : (
@@ -1383,6 +1621,7 @@ export function Workspace() {
                 <SettingsView
                   workspaceName={workspaceName}
                   apiStatus={apiStatus}
+                  inferenceAvailable={inferenceAvailable}
                   hasQuestions={questions.length > 0}
                   onRename={(name) => {
                     setWorkspaceName(name);
@@ -1475,6 +1714,10 @@ export function Workspace() {
           wide
           onClose={() => setPreview(null)}
         >
+          <a className="button" href={originalFileUrl(preview.id)}>
+            <Icon name="download" size={16} />
+            Download original
+          </a>
           <DocumentPreview document={preview} />
         </Dialog>
       )}

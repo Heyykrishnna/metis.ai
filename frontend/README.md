@@ -1,26 +1,24 @@
 # Metis workspace frontend
 
-A light, responsive analytics workspace with no gradients. Run with Node 24 or later:
+A light, responsive analytics workspace with no gradients. From the repository root, use Node 24 or later:
 
 ```sh
-cd frontend
-npm ci
-npm run dev -- --hostname 127.0.0.1
+npm run setup
+npm run dev
 ```
 
-Open http://localhost:3000. The status route checks the backend at `http://127.0.0.1:3001`. Set the server-only `METIS_API_URL` in `frontend/.env.local` to change this address. Never put database credentials or secrets in `NEXT_PUBLIC_*` variables.
+Open `http://127.0.0.1:3005`. The server-side proxy connects to the API at `http://127.0.0.1:3001`. Setup synchronizes `METIS_API_URL` and `METIS_BACKEND_TOKEN` in ignored `frontend/.env.local`. Database credentials stay in the backend. Never use `NEXT_PUBLIC_*` for secrets.
 
 ## Available behavior
 
-- Responsive navigation, workspace overview, keyboard search (`Cmd/Ctrl+K`), templates, and session settings.
-- CSV and JSON table previews, TXT/Markdown previews, source selection, schema field lists, and deterministic format/missing-value checks.
-- File picker and drag/drop, per-file error messages, duplicate detection, removal, and bounded parsing: 10 files, 5 MB each, 10,000 records and 100 columns per table. Previews show at most 100 rows or 20,000 text characters. File values are treated as text, never HTML. CSV blank lines are ignored; JSON must be an array of objects. Column values are retained as text rather than inferred database types.
-- Question drafts, bookmarks, refinement, filtering, plain-text question export, and clearing local history. The most recent 100 drafts and their source filenames persist in browser storage. Files remain in session memory and disappear on refresh; a draft's source name does not reconnect a file.
-- Actual backend health status through a server-side route with a bounded request timeout and safe errors.
+- Upload or drop CSV, JSON, TXT and Markdown files; preview tables and inspect columns and missing values.
+- Persist original file bytes with Brotli compression in Neon. Reload stored files and their saved answers after refresh, download byte-exact originals, or delete a file and its associated analyses.
+- Select a file and ask a question. Table operations include structure, counts, numeric aggregates, grouping and filters. Text answers are verified source excerpts. Unsupported requests produce clarification or abstention; inference outages are visible.
+- Inspect computed rows, source hashes, methods, definitions and limitations. File calculations do not claim to have executed SQL.
+- Use search (`Cmd/Ctrl+K`), responsive navigation, question drafts, bookmarks and refinement. Browser storage contains at most 100 question metadata records; result rows are restored from the authenticated API rather than stored in localStorage.
+- Inspect actual API, storage and inference readiness. The proxy keeps the workspace credential on the server, bounds requests and returns safe dependency errors.
 
-## Integration boundary
-
-The backend currently exposes `/health`. Connection management, authentication, analysis execution, inference, SQL/results, verified analytical evidence, feedback, and database discovery are not implemented APIs. The frontend explicitly identifies questions as unexecuted drafts and presents unavailable states for those services. It never fabricates answers, claims, query results, or a database connection. Neon metadata credentials stay on the backend. Local file checks are separate from verified analytical claims.
+Limits are 10 files per uploader, 5 MiB per file, 10,000 records and 100 columns. Preview limits are 100 rows or 20,000 text characters. Numeric calculations use all validated table records. Text inference currently searches the first 18,000 characters. See [the integration guide](../docs/engineering/integration.md) for runtime boundaries, local authentication and verification.
 
 ## Component provenance
 
@@ -33,4 +31,4 @@ npm run check
 npm audit --omit=dev
 ```
 
-`check` runs lint, formatting, TypeScript, unit tests, API contract consistency, and the production build. Browser checks cover navigation, prompt drafts/bookmarks, file import/preview/validation, keyboard dialogs, and responsive layout.
+`check` runs lint, formatting, TypeScript, unit tests, API contract consistency, and the production build. The live file check in the integration guide exercises actual Neon persistence and local inference. Browser verification is reported separately from automated checks.

@@ -47,9 +47,10 @@ export default function PrivacyPage() {
             <div className="legal-card">
               <h3>Zero Analytical Retention</h3>
               <p>
-                Customer database rows and executed analytical result sets are
-                processed in volatile memory and are not permanently retained in
-                analytical stores without explicit analyst direction.
+                Uploaded files are compressed with Brotli and retained in your
+                configured Neon database with their saved questions and results.
+                Compression is not encryption. Bounded source samples are sent
+                to the configured inference service to plan an answer.
               </p>
             </div>
             <div className="legal-card">
@@ -174,8 +175,10 @@ export default function PrivacyPage() {
               immediately terminate all active and future query executions.
             </li>
             <li>
-              <strong>Delete Analyses & History</strong>: Purge analysis runs,
-              cached previews, and session documents from your workspace.
+              <strong>Delete Uploaded Files</strong>: Removing a stored file
+              also deletes its associated file analyses. Clearing browser
+              history removes local drafts and bookmarks; it does not erase
+              server data.
             </li>
             <li>
               <strong>Manage Recipe Approvals</strong>: Transition analysis

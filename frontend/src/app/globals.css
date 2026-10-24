@@ -2882,3 +2882,20 @@ td:first-child {
   color: #3e5235;
   text-decoration: underline;
 }
+
+.file-evidence {
+  display: grid;
+  grid-template-columns: 100px minmax(0, 1fr);
+  gap: 12px;
+  font-size: 12px;
+  line-height: 1.7;
+  margin-top: 20px;
+}
+.file-evidence dt {
+  color: #697761;
+}
+.file-evidence dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: #4e6149;
+}

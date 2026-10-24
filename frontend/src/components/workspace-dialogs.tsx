@@ -77,8 +77,8 @@ export function FileDialog({
         </>
       )}
       <p className="fine-print">
-        <Icon name="shield" size={13} /> Nothing is uploaded. Files leave the
-        workspace when you refresh.
+        <Icon name="shield" size={13} /> Files are compressed with Brotli and
+        stored in your configured Neon database.
       </p>
       <button className="text-button" onClick={onConnection}>
         <Icon name="database" size={16} />
@@ -624,8 +624,11 @@ export function ActivityDialog({
       <div className="activity-line">
         <Icon name="database" />
         <div>
-          <strong>{documents.length} files in this session</strong>
-          <p>File contents stay in your browser’s memory.</p>
+          <strong>{documents.length} files stored in Neon</strong>
+          <p>
+            Original files are compressed and saved in Neon. Remove a file to
+            delete its stored analyses.
+          </p>
         </div>
       </div>
       <div className="activity-line">

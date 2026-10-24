@@ -1,42 +1,74 @@
 "use client";
 
-import { useMemo, useSyncExternalStore } from "react";
-import { readQuestions, type Question } from "@/lib/workspace";
+import { useSyncExternalStore } from "react";
+import {
+  readQuestions,
+  serializeQuestions,
+  type Question,
+} from "@/lib/workspace";
 
 const key = "metis.questions.v1";
-const eventName = "metis-questions-change";
+const empty: Question[] = [];
+let current: Question[] = empty;
+let initialized = false;
+const listeners = new Set<() => void>();
+
+function hydrate() {
+  if (initialized) return;
+  initialized = true;
+  try {
+    current = readQuestions(
+      serializeQuestions(readQuestions(localStorage.getItem(key) ?? "[]")),
+    );
+  } catch {
+    current = [];
+  }
+}
+
+function changedInAnotherTab(event: StorageEvent) {
+  if (event.key !== key && event.key !== null) return;
+  const restored = readQuestions(event.newValue ?? "[]");
+  current = restored.map((question) => {
+    const cached = current.find(
+      (item) => item.id === question.id && item.runId === question.runId,
+    );
+    return cached ? { ...cached, ...question } : question;
+  });
+  for (const listener of listeners) listener();
+}
 
 function subscribe(listener: () => void) {
-  window.addEventListener("storage", listener);
-  window.addEventListener(eventName, listener);
+  if (!listeners.size) window.addEventListener("storage", changedInAnotherTab);
+  listeners.add(listener);
+  hydrate();
   return () => {
-    window.removeEventListener("storage", listener);
-    window.removeEventListener(eventName, listener);
+    listeners.delete(listener);
+    if (!listeners.size)
+      window.removeEventListener("storage", changedInAnotherTab);
   };
 }
 
 function snapshot() {
+  return current;
+}
+function serverSnapshot() {
+  return empty;
+}
+
+function updateQuestions(update: (questions: Question[]) => Question[]) {
+  hydrate();
+  current = update(current).slice(0, 100);
+  let saved = true;
   try {
-    return localStorage.getItem(key) ?? "[]";
+    localStorage.setItem(key, serializeQuestions(current));
   } catch {
-    return "[]";
+    saved = false;
   }
+  for (const listener of listeners) listener();
+  return saved;
 }
 
 export function useQuestions() {
-  const serialized = useSyncExternalStore(subscribe, snapshot, () => "[]");
-  const questions = useMemo(() => readQuestions(serialized), [serialized]);
-  function updateQuestions(update: (current: Question[]) => Question[]) {
-    try {
-      localStorage.setItem(
-        key,
-        JSON.stringify(update(readQuestions(snapshot())).slice(0, 100)),
-      );
-      window.dispatchEvent(new Event(eventName));
-      return true;
-    } catch {
-      return false;
-    }
-  }
+  const questions = useSyncExternalStore(subscribe, snapshot, serverSnapshot);
   return { questions, updateQuestions };
 }

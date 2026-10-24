@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   check,
+  customType,
   foreignKey,
   integer,
   jsonb,
@@ -329,5 +330,79 @@ export const auditEvents = pgTable(
   },
   (table) => [
     check("audit_expiry", sql`${table.expiresAt} > ${table.occurredAt}`),
+  ],
+);
+
+const binaryContent = customType<{ data: Buffer; driverData: Buffer }>({
+  dataType() {
+    return "bytea";
+  },
+});
+
+export const fileAssets = pgTable(
+  "file_assets",
+  {
+    id: uuid().defaultRandom().primaryKey(),
+    workspaceId: uuid()
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    ownerSubject: text().notNull(),
+    name: text().notNull(),
+    kind: text({ enum: ["CSV", "JSON", "Text"] }).notNull(),
+    originalSize: integer().notNull(),
+    compressedSize: integer().notNull(),
+    compression: text().notNull().default("br"),
+    contentHash: text().notNull(),
+    compressedContent: binaryContent().notNull(),
+    columns: text().array().notNull(),
+    rowCount: integer().notNull(),
+    emptyCells: integer().notNull(),
+    createdAt: timestamp({ withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    unique().on(table.id, table.workspaceId, table.ownerSubject),
+    unique().on(
+      table.workspaceId,
+      table.ownerSubject,
+      table.contentHash,
+      table.name,
+    ),
+    check(
+      "file_size_bounds",
+      sql`${table.originalSize} BETWEEN 1 AND 5242880 AND ${table.compressedSize} > 0`,
+    ),
+    check(
+      "file_brotli_encoding",
+      sql`${table.compression} = 'br' AND octet_length(${table.compressedContent}) = ${table.compressedSize}`,
+    ),
+    check("file_hash", sql`${table.contentHash} ~ '^[a-f0-9]{64}$'`),
+  ],
+);
+
+export const fileAnalyses = pgTable(
+  "file_analyses",
+  {
+    id: uuid().defaultRandom().primaryKey(),
+    fileId: uuid().notNull(),
+    workspaceId: uuid().notNull(),
+    ownerSubject: text().notNull(),
+    question: text().notNull(),
+    sourceHash: text().notNull(),
+    modelVersion: text().notNull(),
+    method: text().notNull(),
+    result: jsonb()
+      .$type<import("../contracts/analysis.js").Result>()
+      .notNull(),
+    createdAt: timestamp({ withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.fileId, table.workspaceId, table.ownerSubject],
+      foreignColumns: [
+        fileAssets.id,
+        fileAssets.workspaceId,
+        fileAssets.ownerSubject,
+      ],
+    }).onDelete("cascade"),
   ],
 );

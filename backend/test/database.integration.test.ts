@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
@@ -11,6 +11,8 @@ import { createMetadataDb } from "../src/db/index.js";
 import { getDefaultSecretStore } from "../src/security/secrets.js";
 import { PostgresAnalyticalAdapter } from "../src/sql/adapter.js";
 import { AnalysisOrchestrator } from "../src/analysis/orchestrator.js";
+import { FileStore } from "../src/files/store.js";
+import type { AuthContext } from "../src/security/auth.js";
 import { OllamaInferenceClient } from "../src/inference/client.js";
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
@@ -75,6 +77,8 @@ describe("disposable PostgreSQL foundation", () => {
       "evidence_items",
       "execution_records",
       "feedback",
+      "file_analyses",
+      "file_assets",
       "memberships",
       "metric_definitions",
       "query_candidates",
@@ -83,6 +87,49 @@ describe("disposable PostgreSQL foundation", () => {
       "verification_reports",
       "workspaces",
     ]);
+  });
+
+  it("persists compressed files and answers while isolating uploaders and cascading deletion", async () => {
+    const workspaceId = randomUUID();
+    const actor: AuthContext = {
+      workspaceId,
+      subject: "file-owner",
+      role: "owner",
+    };
+    const other = { ...actor, subject: "other-member" };
+    const store = new FileStore(db, new OllamaInferenceClient());
+    await client`INSERT INTO workspaces (id, "ownerSubject", name) VALUES (${workspaceId}, ${actor.subject}, 'File integration')`;
+    try {
+      const bytes = Buffer.from(
+        "region,revenue\r\n" + "North,10\r\n".repeat(200),
+      );
+      const uploaded = await store.upload(
+        actor,
+        "integration.csv",
+        bytes.toString("base64"),
+      );
+      expect(uploaded.file.compressedSize).toBeLessThan(bytes.length);
+      expect(uploaded.rows).toHaveLength(100);
+      expect((await store.original(actor, uploaded.file.id))?.bytes).toEqual(
+        bytes,
+      );
+      expect(await store.list(other)).toEqual([]);
+      expect(await store.preview(other, uploaded.file.id)).toBeNull();
+      expect(await store.remove(other, uploaded.file.id)).toBe(false);
+      expect(
+        (await store.analyze(actor, uploaded.file.id, "How many rows?"))?.result
+          .rows,
+      ).toEqual([{ value: 200, included_rows: 200, excluded_empty_rows: 0 }]);
+      expect(await store.history(other)).toEqual([]);
+      expect(await store.history(actor)).toHaveLength(1);
+      expect(await store.remove(actor, uploaded.file.id)).toBe(true);
+      expect(await store.history(actor)).toEqual([]);
+      await expect(
+        store.upload(actor, "bad.csv", "not base64"),
+      ).rejects.toThrow("Invalid file encoding");
+    } finally {
+      await client`DELETE FROM workspaces WHERE id = ${workspaceId}`;
+    }
   });
 
   it("returns independently calculated declines through least-privilege access", async () => {
@@ -193,7 +240,7 @@ describe("disposable PostgreSQL foundation", () => {
 
   it("verifies the generated metadata schema through the application driver", async () => {
     await expect(verifyMetadataSchema(pool)).resolves.toMatchObject({
-      tables: 13,
+      tables: 15,
     });
   });
 

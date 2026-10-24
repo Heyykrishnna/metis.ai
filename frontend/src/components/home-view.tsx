@@ -205,7 +205,7 @@ export function HomeView({
           <div className="stat-grid">
             {[
               {
-                label: "Local files",
+                label: "Stored files",
                 value: documents.length,
                 icon: "database",
               },

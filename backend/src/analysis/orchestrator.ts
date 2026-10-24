@@ -51,6 +51,7 @@ import {
   discoverSchema,
   type DiscoveredSchema,
 } from "./schema.js";
+import { groundQuestion } from "./planning.js";
 import { verifyAnalysis, type VerificationReport } from "./verification.js";
 
 type Scalar = string | number | boolean | null;
@@ -65,6 +66,7 @@ export interface OrchestratorDeps {
   adapter: ConnectorAdapter;
   inference: InferenceClient;
   metadataDb?: MetadataDatabase | null;
+  useModelPlanning?: boolean;
 }
 
 export interface AnalysisInput {
@@ -157,6 +159,7 @@ export class AnalysisOrchestrator {
   private readonly adapter: ConnectorAdapter;
   private readonly inference: InferenceClient;
   private readonly metadataDb: MetadataDatabase | null;
+  private readonly useModelPlanning: boolean;
   private readonly emitter = new EventEmitter();
   private readonly activeRuns = new Map<string, StoredRunState>();
   private readonly baselineSchemas = new Map<string, DiscoveredSchema>();
@@ -165,6 +168,7 @@ export class AnalysisOrchestrator {
     this.adapter = deps.adapter;
     this.inference = deps.inference;
     this.metadataDb = deps.metadataDb ?? null;
+    this.useModelPlanning = deps.useModelPlanning ?? false;
   }
 
   setBaselineSchema(connectionId: string, schema: DiscoveredSchema): void {
@@ -224,9 +228,9 @@ export class AnalysisOrchestrator {
         .where(
           workspaceId
             ? and(
-              eq(analysisRuns.id, runId),
-              eq(analysisRuns.workspaceId, workspaceId),
-            )
+                eq(analysisRuns.id, runId),
+                eq(analysisRuns.workspaceId, workspaceId),
+              )
             : eq(analysisRuns.id, runId),
         );
       const row = rows[0];
@@ -294,9 +298,9 @@ export class AnalysisOrchestrator {
     const candidate =
       state.run.status === "blocked_by_policy" && state.candidate
         ? {
-          ...state.candidate,
-          sqlText: "[REDACTED BLOCKED QUERY]",
-        }
+            ...state.candidate,
+            sqlText: "[REDACTED BLOCKED QUERY]",
+          }
         : state.candidate;
 
     return {
@@ -681,22 +685,22 @@ export class AnalysisOrchestrator {
         ? (this.activeRuns.get(input.parentRunId) ?? null)
         : null;
 
-      const resolution = resolveConversationalFollowUp({
+      let resolution = resolveConversationalFollowUp({
         question: input.question,
         runId,
         parentRunId: input.parentRunId ?? null,
         parentState: parentState
           ? {
-            runId: parentState.run.runId,
-            workspaceId: parentState.workspaceId,
-            connectionId: parentState.connectionId,
-            question: parentState.question,
-            status: parentState.run.status,
-            intent: parentState.intent,
-            plan: parentState.plan,
-            activeContext: parentState.activeContext,
-            assumptions: parentState.assumptions,
-          }
+              runId: parentState.run.runId,
+              workspaceId: parentState.workspaceId,
+              connectionId: parentState.connectionId,
+              question: parentState.question,
+              status: parentState.run.status,
+              intent: parentState.intent,
+              plan: parentState.plan,
+              activeContext: parentState.activeContext,
+              assumptions: parentState.assumptions,
+            }
           : null,
         currentWorkspaceId: input.workspaceId,
         connectionId: input.connectionId,
@@ -707,6 +711,35 @@ export class AnalysisOrchestrator {
         isRecipe: input.isRecipe,
       });
 
+      if (
+        this.useModelPlanning &&
+        resolution.status !== "blocked_by_policy" &&
+        !input.sqlOverride
+      ) {
+        try {
+          const discovered = await discoverSchema(
+            this.adapter,
+            input.allowedSchemas,
+          );
+          resolution = await groundQuestion(
+            this.inference,
+            input.question,
+            discovered,
+            resolution,
+            abortController.signal,
+            parentState !== null,
+          );
+        } catch {
+          resolution = {
+            ...resolution,
+            status: "abstained",
+            reason:
+              "The analytical source or local model is unavailable. No answer was generated.",
+            nextAction:
+              "Use a stored file or check the configured read-only analytical source and inference service.",
+          };
+        }
+      }
       state.activeContext = resolution.activeContext;
       state.delta = resolution.delta;
 
@@ -800,7 +833,7 @@ export class AnalysisOrchestrator {
           const now = new Date();
           const expiresAt = new Date(
             now.getTime() +
-            foundationPolicy.retention.schemaSnapshotDays * 86400000,
+              foundationPolicy.retention.schemaSnapshotDays * 86400000,
           );
           await this.metadataDb
             .insert(schemaSnapshots)
@@ -1129,9 +1162,9 @@ export class AnalysisOrchestrator {
         columns: state.resultColumns,
         rows: state.resultRows,
         coverage: {
-          included: 4,
-          excluded: 2,
-          denominator: 6,
+          included: queryResult.rows.length,
+          excluded: 0,
+          denominator: queryResult.rows.length,
         },
       });
       state.verification = verification;
@@ -1156,18 +1189,37 @@ export class AnalysisOrchestrator {
 
       this.emitProgress(state, "answered");
       state.run.completedAt = new Date().toISOString();
-      state.exclusions = [
-        "School 5 excluded: missing 2025 observation",
-        "School 6 excluded: null 2025 observation",
-      ];
+      state.exclusions = [];
+      const observedAnswer =
+        state.resultRows.length === 0
+          ? "The executed query returned no matching records."
+          : state.resultRows
+              .slice(0, 10)
+              .map((row) =>
+                typeof row.school_id === "number" &&
+                typeof row.delta === "number"
+                  ? `School ${row.school_id} (${row.delta})`
+                  : Object.entries(row)
+                      .map(
+                        ([column, value]) =>
+                          `${column}: ${value === null ? "null" : value}`,
+                      )
+                      .join(", "),
+              )
+              .join("; ");
 
       state.answer = {
         runId,
         status: "answered",
         answerText:
-          "Two schools had lower enrolment in calendar 2025 than calendar 2024: School 1 (-20) and School 4 (-10).",
-        definition:
-          "Calendar year comparison (2025 vs 2024) on schools with non-null observations in both periods",
+          `${state.resultRows.length} result rows. ${observedAnswer}`.slice(
+            0,
+            4096,
+          ),
+        definition: `Executed read-only query for: ${input.question}`.slice(
+          0,
+          4096,
+        ),
         resultReference: runId,
         sqlReference: candidateId,
         evidence: [

@@ -1,3 +1,4 @@
+import { fixtureAdapter } from "./support/fixture-adapter.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildApp, type App } from "../src/app.js";
 import { getDefaultSecretStore } from "../src/security/secrets.js";
@@ -12,7 +13,7 @@ describe("Phase 1 API routes", () => {
   };
 
   beforeAll(async () => {
-    app = await buildApp();
+    app = await buildApp({ adapter: fixtureAdapter() });
     const secrets = getDefaultSecretStore();
     await secrets.set("secret://fixture/reader", "fixture-password");
   });

@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { readQuestions } from "../src/lib/workspace";
+import { readQuestions, serializeQuestions } from "../src/lib/workspace";
 
 const draft = {
   id: "q1",
@@ -42,4 +42,27 @@ it("bounds restored question history to 100 records", () => {
       ),
     ),
   ).toHaveLength(100);
+});
+
+it("persists draft metadata without retaining private result rows", () => {
+  const serialized = serializeQuestions([
+    {
+      ...draft,
+      fileId: "file-1",
+      result: {
+        answer: {
+          runId: "run-1",
+          status: "abstained",
+          reason: "private reason",
+          nextAction: "clarify",
+          assumptions: [],
+          limitations: [],
+        },
+        columns: ["private_column"],
+        rows: [{ private_column: "private_value" }],
+      },
+    },
+  ]);
+  expect(JSON.parse(serialized)).toEqual([{ ...draft, fileId: "file-1" }]);
+  expect(serialized).not.toContain("private");
 });

@@ -9,6 +9,8 @@ export type LocalDocument = {
   rowCount: number;
   emptyCells: number;
   addedAt: number;
+  compressedSize?: number;
+  sha256?: string;
 };
 
 export const MAX_FILE_SIZE = 5 * 1024 * 1024;

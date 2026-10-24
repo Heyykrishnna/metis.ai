@@ -218,7 +218,7 @@ export const AnswerEnvelopeSchema = Type.Union([
       answerText: TextSchema,
       definition: TextSchema,
       resultReference: IdSchema,
-      sqlReference: IdSchema,
+      sqlReference: Type.Union([IdSchema, Type.Null()]),
       evidence: Type.Array(TextSchema, { minItems: 1, maxItems: 100 }),
     },
     { additionalProperties: false },
@@ -308,6 +308,7 @@ export const EvidenceBundleSchema = Type.Union([
 ]);
 export type QuestionIntent = Static<typeof QuestionIntentSchema>;
 export type AnalyticalPlan = Static<typeof AnalyticalPlanSchema>;
+export type Result = Static<typeof ResultSchema>;
 export type AnswerEnvelope = Static<typeof AnswerEnvelopeSchema>;
 export type RunStatus = Static<typeof RunStatusSchema>;
 

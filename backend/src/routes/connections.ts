@@ -55,6 +55,12 @@ export function getMemoryConnection(
   return undefined;
 }
 
+export function setMemoryConnection(
+  connection: Connection & { workspaceId: string },
+): void {
+  memoryConnections.set(connection.id, connection);
+}
+
 export const connectionRoutes: FastifyPluginAsyncTypebox = async (app) => {
   app.addHook("preHandler", requireAuth);
 
