@@ -3,6 +3,7 @@
 import { useRef } from "react";
 import { PromptEditor } from "./prompt-editor";
 import { Icon, type IconName } from "../icon";
+import { Orb } from "./orb";
 
 const modes: { label: string; icon: IconName }[] = [
   { label: "Ask your data", icon: "chat" },
@@ -20,6 +21,7 @@ export function AIInput({
   mode,
   onModeChange,
   sourceCount,
+  syncing,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -30,8 +32,12 @@ export function AIInput({
   mode: string;
   onModeChange: (mode: string) => void;
   sourceCount: number;
+  syncing: boolean;
 }) {
   const input = useRef<HTMLTextAreaElement>(null);
+  function submit() {
+    if (!syncing) onSubmit();
+  }
   return (
     <div className="composer-shell">
       <div className="composer-modes" aria-label="Analysis mode">
@@ -55,7 +61,7 @@ export function AIInput({
         className="prompt-input"
         onSubmit={(event) => {
           event.preventDefault();
-          onSubmit();
+          submit();
         }}
       >
         <div className="prompt-text">
@@ -63,7 +69,7 @@ export function AIInput({
             inputRef={input}
             value={value}
             onChange={onChange}
-            onSubmit={onSubmit}
+            onSubmit={submit}
             placeholder={
               mode === "Verify a claim"
                 ? "What would you like to double-check?"
@@ -79,6 +85,7 @@ export function AIInput({
               className="icon-button attach"
               type="button"
               aria-label="Attach a file"
+              disabled={syncing}
               onClick={onAttach}
             >
               <Icon name="plus" />
@@ -87,9 +94,17 @@ export function AIInput({
               type="button"
               className="source-selector"
               onClick={onSelectSource}
+              disabled={syncing}
+              aria-busy={syncing}
+              title={syncing ? "Syncing workspace" : source}
             >
-              <Icon name="database" size={15} />
-              <span>{source}</span>
+              {syncing ? <Orb size={20} /> : <Icon name="database" size={15} />}
+              <span
+                className="source-selector-label"
+                role={syncing ? "status" : undefined}
+              >
+                {syncing ? "Syncing workspace…" : source}
+              </span>
               <Icon name="down" size={13} />
             </button>
           </div>
@@ -107,7 +122,7 @@ export function AIInput({
             <button
               type="submit"
               className="send-button"
-              disabled={!value.trim()}
+              disabled={!value.trim() || syncing}
               aria-label="Submit question"
             >
               <Icon name="up" size={17} />

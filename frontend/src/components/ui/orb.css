@@ -17,14 +17,6 @@
   border-radius: 50%;
 }
 
-.sync-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 10px;
-  color: #64786b;
-}
-
 .source-loading {
   display: grid;
   justify-items: center;
@@ -37,10 +29,4 @@
 .source-loading strong {
   color: var(--foreground);
   font-weight: 500;
-}
-
-@media (max-width: 760px) {
-  .sync-status > span:last-child {
-    display: none;
-  }
 }

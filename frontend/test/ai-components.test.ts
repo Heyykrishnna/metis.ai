@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { FileDropzone } from "../src/components/ui/file-dropzone";
 import { ThinkingPanel } from "../src/components/ui/thinking-panel";
+import { AIInput } from "../src/components/ui/ai-input";
 import type { Question } from "../src/lib/workspace";
 
 const question: Question = {
@@ -14,6 +15,44 @@ const question: Question = {
   createdAt: 1,
   saved: false,
 };
+
+function renderComposer(syncing: boolean) {
+  return renderToStaticMarkup(
+    createElement(AIInput, {
+      value: "How many rows are there?",
+      onChange: () => undefined,
+      onSubmit: () => undefined,
+      onAttach: () => undefined,
+      onSelectSource: () => undefined,
+      source: "records.csv",
+      sourceCount: 1,
+      mode: "Ask your data",
+      onModeChange: () => undefined,
+      syncing,
+    }),
+  );
+}
+
+describe("source synchronization", () => {
+  it("places the searching orb in the source selector and waits before submitting", () => {
+    const html = renderComposer(true);
+    expect(html).toContain("Syncing workspace…");
+    expect(html).toContain('data-state="searching"');
+    expect(html).toContain('aria-busy="true"');
+    expect(html).toMatch(
+      /<button[^>]*disabled[^>]*aria-label="Submit question"/,
+    );
+  });
+
+  it("restores the selected source when synchronization finishes", () => {
+    const html = renderComposer(false);
+    expect(html).toContain("records.csv");
+    expect(html).toContain('aria-busy="false"');
+    expect(html).not.toContain("Syncing workspace…");
+    expect(html).not.toContain('data-state="searching"');
+    expect(html).not.toMatch(/<button[^>]*disabled/);
+  });
+});
 
 describe("file upload states", () => {
   it("offers a native multi-file chooser with supported formats", () => {

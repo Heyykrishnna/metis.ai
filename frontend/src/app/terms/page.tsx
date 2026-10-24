@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { BrandMark } from "@/components/brand-mark";
 
 export const metadata: Metadata = {
   title: "Terms of Service · metis.ai",
@@ -15,7 +16,7 @@ export default function TermsPage() {
           ← Back to Metis Workspace
         </Link>
         <div className="legal-brand">
-          <span className="brand-dot" />
+          <BrandMark size={26} />
           <span className="brand-text">metis.ai</span>
         </div>
       </header>

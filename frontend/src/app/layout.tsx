@@ -15,7 +15,6 @@ const poppins = localFont({
 export const metadata: Metadata = {
   title: "metis.ai",
   description: "Evidence-grounded analytics for unfamiliar databases.",
-  icons: { icon: "/icon.svg", shortcut: "/icon.svg" },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
