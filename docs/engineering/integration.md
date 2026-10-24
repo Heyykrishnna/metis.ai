@@ -18,7 +18,7 @@ Ollama must contain `qwen2.5-coder:7b-instruct-q4_K_M`, as pinned in `inference/
 1. Upload CSV, JSON array-of-objects, TXT or Markdown using the workspace.
 2. The API validates UTF-8, names, structure and limits, compresses original bytes using Node's Brotli implementation at quality 5, and saves a `bytea` payload in Neon with SHA-256, original/compressed sizes and parsed metadata. No filesystem upload cache is required. Compression may increase the size of very small files.
 3. The UI selects the saved file. Questions go through the same-origin Next.js proxy to the authenticated API. No separate SQL connection is needed.
-4. Structure, simple record counts and named left/right skew questions work without a model. For other table questions, local Qwen returns a constrained operation plan. The server validates columns and executes supported filtering, grouping, counts, full-file schema profiling, numeric aggregates and Fisher-Pearson sample skewness over the complete validated file. The model does not supply calculated totals.
+4. Structure, record counts, named sums/averages/minimums/maximums, grouping and left/right skew questions work without a model. For other table questions, local Qwen returns a constrained operation plan. Unsupported statistics such as median, mode or normality abstain even if inference is down. The server validates columns and executes supported filtering, grouping, counts, full-file schema profiling, numeric aggregates and Fisher-Pearson sample skewness over the complete validated file. The model does not supply calculated totals.
 5. Text answers contain only passages confirmed to exist in the original document. Missing evidence leads to abstention. Unsupported operations or ambiguous metrics require clarification.
 6. Neon stores the question, source hash, method, model identifier and result. Refresh restores files and the latest 50 file analyses. Browser storage retains only draft/bookmark metadata. Clearing browser history does not delete server history. Removing a file cascades deletion of its file analyses.
 7. Original downloads decompress the stored bytes and verify exact size and SHA-256 before returning them. Evidence exports include the result and computation definition; file calculations have no fabricated SQL reference.
@@ -44,11 +44,11 @@ npm --prefix backend run test:files:live
 npm run test:web:live
 ```
 
-The disposable PostgreSQL runner requires `initdb`, `pg_ctl`, `createdb`, `pg_dump` and `pg_restore` on PATH, or `PG_BINDIR` pointing to their directory. It never targets Neon. The live file check deliberately targets the existing configured Neon database, uploads its own uniquely named synthetic file, verifies byte-exact restoration, full-file overview, real Qwen grouped decimal totals, API restart persistence and invalid-token denial, and removes only that file. Run while Ollama is available. This is an integration check, not a broad question-accuracy benchmark.
+The disposable PostgreSQL runner requires `initdb`, `pg_ctl`, `createdb`, `pg_dump` and `pg_restore` on PATH, or `PG_BINDIR` pointing to their directory. It never targets Neon. The live file check deliberately targets the existing configured Neon database, uploads its own uniquely named synthetic file, verifies byte-exact restoration, full-file overview, grouped decimal totals, API restart persistence and invalid-token denial, and removes only that file. This is an integration check, not a broad question-accuracy benchmark.
 
 See `backend/src/files`, `backend/src/routes/files.ts`, `frontend/src/lib/file-client.ts` and `frontend/src/components/workspace.tsx` for the implementation. The additive `0001` migration creates `file_assets` and `file_analyses` without rewriting existing tables.
 
-The live web check calls the running frontend proxy without a browser credential, verifies upload, byte-exact download, model-planned results and persisted history through Next.js → Fastify → Neon, and cleans up its synthetic file. Start `npm run dev` first; use `WEB_URL` to target a different local frontend address.
+The live web check calls the running frontend proxy without a browser credential, verifies upload, byte-exact download, grouped totals and persisted history through Next.js → Fastify → Neon, and cleans up its synthetic file. Start `npm run dev` first; use `WEB_URL` to target a different local frontend address.
 
 ## Answer presentation and clarification
 

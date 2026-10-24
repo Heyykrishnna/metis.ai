@@ -52,5 +52,5 @@ try {
 }
 
 process.stdout.write(
-  "Frontend proxy flow passed: upload, Neon Brotli persistence, byte-exact download, real model calculation, saved history and deletion.\n",
+  "Frontend proxy flow passed: upload, Neon Brotli persistence, byte-exact download, grouped totals, saved history and deletion.\n",
 );

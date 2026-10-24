@@ -51,8 +51,14 @@ import {
   discoverSchema,
   type DiscoveredSchema,
 } from "./schema.js";
+import { generateSchemaConstellation } from "./constellation.js";
 import { groundQuestion } from "./planning.js";
 import { verifyAnalysis, type VerificationReport } from "./verification.js";
+import {
+  groqClient,
+  type GroqClient,
+  type StatisticalContext,
+} from "../inference/groq.js";
 
 type Scalar = string | number | boolean | null;
 type TerminalStatus = (typeof terminalStatuses)[number];
@@ -67,6 +73,7 @@ export interface OrchestratorDeps {
   inference: InferenceClient;
   metadataDb?: MetadataDatabase | null;
   useModelPlanning?: boolean;
+  groq?: GroqClient;
 }
 
 export interface AnalysisInput {
@@ -160,6 +167,7 @@ export class AnalysisOrchestrator {
   private readonly inference: InferenceClient;
   private readonly metadataDb: MetadataDatabase | null;
   private readonly useModelPlanning: boolean;
+  private readonly groq: GroqClient;
   private readonly emitter = new EventEmitter();
   private readonly activeRuns = new Map<string, StoredRunState>();
   private readonly baselineSchemas = new Map<string, DiscoveredSchema>();
@@ -169,6 +177,7 @@ export class AnalysisOrchestrator {
     this.inference = deps.inference;
     this.metadataDb = deps.metadataDb ?? null;
     this.useModelPlanning = deps.useModelPlanning ?? false;
+    this.groq = deps.groq ?? groqClient;
   }
 
   setBaselineSchema(connectionId: string, schema: DiscoveredSchema): void {
@@ -685,6 +694,14 @@ export class AnalysisOrchestrator {
         ? (this.activeRuns.get(input.parentRunId) ?? null)
         : null;
 
+      const classification = await this.groq.classify(input.question);
+      let statisticalContext: StatisticalContext | undefined;
+      if (classification.classification === "statistical") {
+        statisticalContext = await this.groq.contextualizeStatisticalQuery({
+          question: input.question,
+        });
+      }
+
       let resolution = resolveConversationalFollowUp({
         question: input.question,
         runId,
@@ -728,6 +745,7 @@ export class AnalysisOrchestrator {
             resolution,
             abortController.signal,
             parentState !== null,
+            statisticalContext?.guidance,
           );
         } catch {
           resolution = {
@@ -827,6 +845,11 @@ export class AnalysisOrchestrator {
       const snapshotId = randomUUID();
       const schemaHash = calculateSchemaHash(discovered);
       state.snapshotId = snapshotId;
+      const constellation = generateSchemaConstellation(
+        input.connectionId,
+        snapshotId,
+        discovered,
+      );
 
       if (this.metadataDb) {
         try {
@@ -869,6 +892,19 @@ export class AnalysisOrchestrator {
       const candidateId = randomUUID();
       let generatedSql = input.sqlOverride ?? resolution.sqlText;
       const role = input.role ?? "owner";
+
+      if (resolution.activeContext.metric === "schema_overview") {
+        const firstTable = discovered.tables[0];
+        if (firstTable) {
+          generatedSql = `SELECT count(*)::int AS total_records FROM ${firstTable.schema}.${firstTable.name};`;
+          resolution.activeContext.sources = [
+            `${firstTable.schema}.${firstTable.name}`,
+          ];
+        } else {
+          generatedSql = "SELECT 1 AS schema_overview;";
+          resolution.activeContext.sources = [];
+        }
+      }
 
       if (driftDiff && driftDiff.hasDrift) {
         const recovery = recoverEvolvedSql({
@@ -1140,6 +1176,50 @@ export class AnalysisOrchestrator {
         return clean;
       });
 
+      if (resolution.activeContext.metric === "schema_overview") {
+        state.resultColumns = [
+          "table_name",
+          "column_name",
+          "data_type",
+          "nullable",
+          "relationship",
+        ];
+        state.resultRows = [];
+        for (const table of discovered.tables) {
+          for (const col of table.columns) {
+            const edge = constellation.edges.find(
+              (e) =>
+                e.sourceTable === `${table.schema}.${table.name}` &&
+                e.sourceColumn === col.name,
+            );
+            const isPk = table.primaryKey.includes(col.name);
+            const relationship = edge
+              ? `References ${edge.targetTable}.${edge.targetColumn} (${edge.confidence})`
+              : isPk
+                ? "Primary Key"
+                : col.name.toLowerCase().endsWith("_id")
+                  ? "Inferred foreign identifier"
+                  : "Attribute";
+            state.resultRows.push({
+              table_name: `${table.schema}.${table.name}`,
+              column_name: col.name,
+              data_type: col.type,
+              nullable: col.nullable ? "YES" : "NO",
+              relationship,
+            });
+          }
+        }
+        if (state.resultRows.length === 0) {
+          state.resultRows.push({
+            table_name: "none",
+            column_name: "none",
+            data_type: "text",
+            nullable: "NO",
+            relationship: "No tables found in allowed schemas",
+          });
+        }
+      }
+
       state.execution = {
         runId,
         queryHash: createHash("sha256").update(generatedSql).digest("hex"),
@@ -1208,14 +1288,75 @@ export class AnalysisOrchestrator {
               )
               .join("; ");
 
+      let answerText =
+        `${state.resultRows.length} result rows. ${observedAnswer}`.slice(
+          0,
+          4096,
+        );
+
+      if (resolution.activeContext.metric === "schema_overview") {
+        const tableSummary = discovered.tables
+          .map(
+            (t) =>
+              `${t.schema}.${t.name} (${t.rowCount} rows, ${t.columns.length} columns)`,
+          )
+          .join("; ");
+        const edgeSummary =
+          constellation.edges.length > 0
+            ? constellation.edges
+                .map(
+                  (e) =>
+                    `${e.sourceTable}.${e.sourceColumn} -> ${e.targetTable}.${e.targetColumn} (${e.confidence})`,
+                )
+                .join("; ")
+            : "No foreign key relationships detected.";
+
+        answerText =
+          `Database overview for connection ${input.connectionId}:\n` +
+          `• Discovered Tables (${discovered.tables.length}): ${tableSummary || "None in allowed schemas"}\n` +
+          `• Relationships & Constraints: ${edgeSummary}\n` +
+          `The full catalog of tables, columns, data types, and relationships is detailed below.`;
+
+        answerText = await this.groq.synthesizeSchemaAnswer({
+          question: input.question,
+          datasetName: input.connectionId,
+          tables: discovered.tables.map((t) => ({
+            name: `${t.schema}.${t.name}`,
+            rowCount: t.rowCount,
+            columns: t.columns.map((c) => ({
+              name: c.name,
+              type: c.type,
+              nullable: c.nullable,
+            })),
+          })),
+          relationships: constellation.edges.map((e) => ({
+            source: `${e.sourceTable}.${e.sourceColumn}`,
+            target: `${e.targetTable}.${e.targetColumn}`,
+            type: e.confidence,
+            description: e.notes,
+          })),
+          originalAnswerText: answerText,
+        });
+      } else if (
+        classification.classification === "statistical" &&
+        state.resultRows.length > 0
+      ) {
+        answerText = await this.groq.synthesizeStatisticalAnswer({
+          question: input.question,
+          statisticalContext,
+          calculatedResults: {
+            columns: state.resultColumns,
+            rows: state.resultRows as Record<string, unknown>[],
+            summary: observedAnswer,
+          },
+          originalAnswerText: answerText,
+        });
+      }
+
       state.answer = {
         runId,
         status: "answered",
-        answerText:
-          `${state.resultRows.length} result rows. ${observedAnswer}`.slice(
-            0,
-            4096,
-          ),
+        answerText: answerText.slice(0, 4096),
         definition: `Executed read-only query for: ${input.question}`.slice(
           0,
           4096,

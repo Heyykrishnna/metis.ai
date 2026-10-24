@@ -72,6 +72,10 @@ export function readConfig(source: NodeJS.ProcessEnv) {
     LOG_LEVEL: logLevel,
     DATABASE_URL: databaseUrl,
     DATABASE_URL_UNPOOLED: source.DATABASE_URL_UNPOOLED,
+    GROQ_API_KEY:
+      source.GROQ_API_KEY ??
+      "",
+    GROQ_MODEL: source.GROQ_MODEL ?? "openai/gpt-oss-120b",
   } as const;
 }
 

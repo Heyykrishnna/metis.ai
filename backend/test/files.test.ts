@@ -135,15 +135,98 @@ it("does not silently turn nonnumeric data or unknown columns into answers", asy
   expect(unknown.result.answer.status).toBe("needs_clarification");
 });
 
-it("handles an inference outage and refuses fabricated text quotations", async () => {
-  const unavailable = await answerFile(
+it("sums a named column without a model dependency", async () => {
+  const result = await answerFile(
     file(),
     parseFile("revenue.csv", source),
     "calculate total revenue",
     randomUUID(),
     planner(null),
   );
-  expect(unavailable.result.answer.status).toBe("execution_failed");
+  expect(result.result.answer.status).toBe("answered");
+  expect(result.method).toBe("deterministic");
+  expect(result.result.rows).toEqual([
+    { value: "20.3", included_rows: 3, excluded_empty_rows: 1 },
+  ]);
+});
+
+it("groups a named total without a model dependency", async () => {
+  const result = await answerFile(
+    file(),
+    parseFile("revenue.csv", source),
+    "What is the total revenue grouped by region?",
+    randomUUID(),
+    planner(null),
+  );
+  expect(result.result.answer.status).toBe("answered");
+  expect(result.method).toBe("deterministic");
+  expect(result.result.rows).toEqual([
+    { region: "North", value: "0.3", included_rows: 2, excluded_empty_rows: 0 },
+    { region: "South", value: "20", included_rows: 1, excluded_empty_rows: 1 },
+  ]);
+});
+
+it("averages a named column without a model dependency", async () => {
+  const result = await answerFile(
+    file(),
+    parseFile("revenue.csv", source),
+    "Give me the average revenue",
+    randomUUID(),
+    planner(null),
+  );
+  expect(result.result.answer.status).toBe("answered");
+  expect(result.result.rows).toEqual([
+    {
+      value: expect.stringMatching(/^6\.7666/),
+      included_rows: 3,
+      excluded_empty_rows: 1,
+    },
+  ]);
+});
+
+it("abstains from unsupported statistics without waiting for inference", async () => {
+  const normality = await answerFile(
+    file(),
+    parseFile("revenue.csv", source),
+    "Is the data distribution is normalised or not?",
+    randomUUID(),
+    planner(null),
+  );
+  expect(normality.result.answer.status).toBe("abstained");
+  expect(
+    normality.result.answer.status === "abstained" &&
+      normality.result.answer.reason,
+  ).toMatch(/skewness/i);
+  const mixed = await answerFile(
+    file(),
+    parseFile("revenue.csv", source),
+    "Tell me the normalisation table and what is the median, mode and stuff?",
+    randomUUID(),
+    planner(null),
+  );
+  expect(mixed.result.answer.status).toBe("abstained");
+});
+
+it("asks for a supported file operation when the planner is unavailable", async () => {
+  const result = await answerFile(
+    file(),
+    parseFile("revenue.csv", source),
+    "What are the most important trends in this dataset?",
+    randomUUID(),
+    planner(null),
+  );
+  expect(result.result.answer.status).toBe("needs_clarification");
+  expect(
+    result.result.answer.status === "needs_clarification" &&
+      result.result.answer.reason,
+  ).not.toMatch(/inference recovers|how many rows/i);
+  expect(
+    result.result.answer.status === "needs_clarification" &&
+      result.result.answer.reason,
+  ).toMatch(/name a column/i);
+});
+
+it("handles an inference outage and refuses fabricated text quotations", async () => {
   const text = await answerFile(
     { ...file(), name: "notes.txt", kind: "Text" },
     parseFile("notes.txt", Buffer.from("The project starts in June.")),
@@ -356,4 +439,25 @@ it("still abstains from unsupported correlation questions", async () => {
     }),
   );
   expect(result.result.answer.status).toBe("abstained");
+});
+
+it("answers 'Help me understand the tables, columns, and relationships in my data.' without requiring an inference model", async () => {
+  const result = await answerFile(
+    file(),
+    parseFile("revenue.csv", source),
+    "Help me understand the tables, columns, and relationships in my data.",
+    randomUUID(),
+    planner(null),
+  );
+  expect(Check(FileAnalysisSchema, result)).toBe(true);
+  expect(result.result.answer.status).toBe("answered");
+  expect(result.result.rows.length).toBe(2);
+  expect(
+    result.result.answer.status === "answered" &&
+      result.result.answer.answerText,
+  ).toContain("revenue.csv");
+  expect(
+    result.result.answer.status === "answered" &&
+      result.result.answer.answerText,
+  ).toContain("Columns: region, revenue");
 });

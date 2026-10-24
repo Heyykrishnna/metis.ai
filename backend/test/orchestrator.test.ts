@@ -251,4 +251,31 @@ describe("AnalysisOrchestrator and 7 terminal statuses", () => {
     const result = await orchestrator.getResult(run.runId);
     expect(result.answer.status).toBe("timed_out");
   });
+
+  it("answers 'Help me understand the tables, columns, and relationships in my data.' with discovered schema and relationships", async () => {
+    const orchestrator = new AnalysisOrchestrator(createDeps());
+    const run = await orchestrator.executeAnalysis({
+      runId: "00000000-0000-4000-8000-000000000008",
+      workspaceId: "00000000-0000-4000-8000-000000000010",
+      connectionId: "00000000-0000-4000-8000-000000000020",
+      allowedSchemas: ["analytics_clean"],
+      question:
+        "Help me understand the tables, columns, and relationships in my data.",
+    });
+
+    expect(run.status).toBe("answered");
+    const result = await orchestrator.getResult(run.runId);
+    expect(result.answer.status).toBe("answered");
+    expect(result.columns).toEqual([
+      "table_name",
+      "column_name",
+      "data_type",
+      "nullable",
+      "relationship",
+    ]);
+    expect(result.rows.length).toBeGreaterThan(0);
+    expect(
+      result.answer.status === "answered" && result.answer.answerText,
+    ).toContain("Database overview");
+  });
 });

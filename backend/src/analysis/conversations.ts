@@ -125,6 +125,7 @@ export function resolveConversationalFollowUp(
     parentState,
     currentWorkspaceId,
     connectionId,
+    allowedSchemas,
     role,
     actorSubject,
     sqlOverride,
@@ -350,6 +351,75 @@ ORDER BY current.school_id;`;
         newValues: {},
         changeType: "initial",
         explanation: "Abstained due to unavailable data period",
+      },
+    };
+  }
+
+  const isSchemaInquiry =
+    (/\b(?:tables?,?\s+columns?,?\s+and\s+relationships?|tables?\s+and\s+columns?|columns?\s+and\s+tables?|relationships?\s+in\s+my\s+data)\b/i.test(
+      qLower,
+    ) ||
+      ((qLower.includes("table") ||
+        qLower.includes("column") ||
+        qLower.includes("relationship")) &&
+        /\b(?:understand|explore|explain|show|describe|structure|catalog)\b/i.test(
+          qLower,
+        ))) &&
+    !/\b(?:where|only|exclude|sum|average|skew|correlation|decline|declined)\b/i.test(
+      qLower,
+    );
+
+  if (isSchemaInquiry) {
+    const schemaIntent: QuestionIntent = {
+      question,
+      entities: ["tables", "columns", "relationships"],
+      measures: ["table_count", "column_count"],
+      dimensions: [
+        "table_name",
+        "column_name",
+        "data_type",
+        "nullable",
+        "relationship",
+      ],
+      filters: [],
+      timeRange: null,
+      comparison: null,
+      grain: ["table_name", "column_name"],
+      ambiguityFlags: [],
+    };
+    const schemaPlan: AnalyticalPlan = {
+      sources: allowedSchemas.map((s) => `${s}.*`),
+      joinEdges: [],
+      predicates: [],
+      aggregations: [],
+      grain: ["table_name", "column_name"],
+      nullPolicy: "Inspect discovered schema catalog for field nullability",
+      assumptions: [
+        "Schema discovered directly from database system catalog and constraints",
+      ],
+      verificationPlan: ["policy", "output-shape", "output-grain"],
+    };
+    const schemaContext: ActiveContext = {
+      connectionId,
+      sources: allowedSchemas.map((s) => `${s}.*`),
+      metric: "schema_overview",
+      grain: ["table_name", "column_name"],
+      timeRange: null,
+      filters: [],
+      confirmedAssumptions: ["Schema and relationships exploration request"],
+    };
+    return {
+      status: "execute",
+      intent: schemaIntent,
+      plan: schemaPlan,
+      sqlText: "SELECT 1 AS schema_overview;",
+      activeContext: schemaContext,
+      delta: {
+        changedFields: ["intent"],
+        previousValues: {},
+        newValues: { intent: "schema_overview" },
+        changeType: "initial",
+        explanation: "Schema, tables, columns, and relationships exploration",
       },
     };
   }
