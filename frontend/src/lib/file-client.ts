@@ -1,4 +1,5 @@
 import type { components } from "../generated/api";
+import { normalizeFileAnalysis } from "./file-presentation";
 import type { LocalDocument } from "./local-files";
 
 type FilePreview = components["schemas"]["FilePreview"];
@@ -70,13 +71,17 @@ export async function deleteFile(id: string) {
   return request<{ deleted: boolean }>(`/v1/files/${id}`, { method: "DELETE" });
 }
 export async function analyzeFile(fileId: string, question: string) {
-  return request<FileAnalysis>(`/v1/files/${fileId}/analyses`, {
-    method: "POST",
-    body: JSON.stringify({ question }),
-  });
+  return normalizeFileAnalysis(
+    await request<FileAnalysis>(`/v1/files/${fileId}/analyses`, {
+      method: "POST",
+      body: JSON.stringify({ question }),
+    }),
+  );
 }
 export async function fileHistory() {
-  return request<FileAnalysis[]>("/v1/file-analyses");
+  return (await request<FileAnalysis[]>("/v1/file-analyses")).map(
+    normalizeFileAnalysis,
+  );
 }
 export function originalFileUrl(id: string) {
   return `/api/backend/v1/files/${id}/content`;

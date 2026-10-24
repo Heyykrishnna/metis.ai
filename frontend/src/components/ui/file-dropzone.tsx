@@ -33,21 +33,15 @@ export function FileDropzone({
         if (!busy) onFiles(Array.from(event.dataTransfer.files));
       }}
     >
-      <div className="file-art" aria-hidden="true">
-        <span className="file-art-back" />
-        <span className="file-art-front">
-          <Icon name="file" size={28} />
-        </span>
-        <span className="file-art-plus">
-          <Icon name="plus" size={14} />
-        </span>
-      </div>
+      <span className="dropzone-icon" aria-hidden="true">
+        <Icon name="upload" size={20} />
+      </span>
       <h3>
         {busy
-          ? "Reading your files…"
+          ? "Saving your files…"
           : dragging
-            ? "A good place to drop your data"
-            : "A little context goes a long way"}
+            ? "Drop files to add them"
+            : "Add your data"}
       </h3>
       <p>Drop your files here, or choose them below.</p>
       <button
@@ -57,7 +51,7 @@ export function FileDropzone({
         onClick={() => input.current?.click()}
       >
         <Icon name="upload" size={16} />
-        {busy ? "Reading files…" : "Choose files"}
+        {busy ? "Saving files…" : "Choose files"}
       </button>
       <span className="file-note">
         CSV, JSON, TXT, MD · Up to 5 MB each · 10 files

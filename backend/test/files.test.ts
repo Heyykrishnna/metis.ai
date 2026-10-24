@@ -201,3 +201,83 @@ it("preserves JSON numeric literals before decimal computation", () => {
     ).rows,
   ).toEqual([["9007199254740993", "0.1234567890123456789"]]);
 });
+
+it("does not present a plan requesting clarification as an answered calculation", async () => {
+  const result = await answerFile(
+    file(),
+    parseFile("revenue.csv", source),
+    "Is revenue left or right skewed?",
+    randomUUID(),
+    planner({
+      operation: "describe",
+      column: "revenue",
+      groupBy: null,
+      filters: [],
+      clarification: "Which distribution measure should I use?",
+    }),
+  );
+  expect(result.result.answer.status).toBe("needs_clarification");
+});
+
+it("answers an explicit schema request without an inference dependency using all records", async () => {
+  const result = await answerFile(
+    file(),
+    parseFile("revenue.csv", source),
+    "Show me the schema of this file",
+    randomUUID(),
+    planner(null),
+  );
+  expect(result.result.answer.status).toBe("answered");
+  expect(result.result.rows).toContainEqual({
+    field: "revenue",
+    observed_type: "decimal",
+    nullable: true,
+    nonempty_rows: 3,
+    empty_rows: 1,
+  });
+});
+
+it("profiles schema types across records beyond the display preview", async () => {
+  const data = Buffer.from(
+    "amount,active\n" + "1,true\n".repeat(100) + "0.5,false\n,false\n",
+  );
+  const result = await answerFile(
+    file(),
+    parseFile("full.csv", data),
+    "Show schema",
+    randomUUID(),
+    planner(null),
+  );
+  expect(result.result.rows).toContainEqual({
+    field: "amount",
+    observed_type: "decimal",
+    nullable: true,
+    nonempty_rows: 101,
+    empty_rows: 1,
+  });
+  expect(result.result.rows).toContainEqual({
+    field: "active",
+    observed_type: "boolean",
+    nullable: false,
+    nonempty_rows: 102,
+    empty_rows: 0,
+  });
+});
+
+it("refuses to substitute an average for a skewness question", async () => {
+  const result = await answerFile(
+    file(),
+    parseFile("revenue.csv", source),
+    "Is revenue left or right skewed?",
+    randomUUID(),
+    planner({
+      operation: "average",
+      column: "revenue",
+      groupBy: null,
+      filters: [],
+      clarification: "",
+    }),
+  );
+  expect(result.result.answer.status).toBe("abstained");
+  expect(result.result.rows).toEqual([]);
+});
