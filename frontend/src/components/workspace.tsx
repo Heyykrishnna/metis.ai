@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import {
   MAX_FILES,
   MAX_FILE_SIZE,
@@ -8,6 +9,26 @@ import {
   type LocalDocument,
 } from "@/lib/local-files";
 import { downloadText, type Question } from "@/lib/workspace";
+import {
+  getConnections,
+  getSchemaConstellation,
+  submitAnalysis,
+  getRun,
+  getRunResult,
+  getRunEvidence,
+  getTruthLedger,
+  getDirtyRadar,
+  reviewRadarAnomaly,
+  getCounterfactuals,
+  getQueryCostPassport,
+  getRecipes,
+  executeRecipe,
+  submitFeedback,
+  getExportUrl,
+  type Connection,
+  type SchemaConstellation,
+  type Recipe,
+} from "@/lib/api-client";
 import { Dialog } from "./dialog";
 import {
   FileDialog,
@@ -30,6 +51,11 @@ import {
   QuestionList,
   SchemaView,
   TemplatesView,
+  ResultsTable,
+  DirtyRadarView,
+  CounterfactualView,
+  PassportView,
+  RecipesView,
 } from "./workspace-views";
 
 const descriptions: Record<View, string> = {
@@ -68,33 +94,81 @@ export function Workspace() {
     "checking",
   );
   const [statusVersion, setStatusVersion] = useState(0);
+
+  const [connections, setConnections] = useState<Connection[]>([]);
+  const [activeConnectionId, setActiveConnectionId] = useState<string | null>(
+    null,
+  );
+  const [constellation, setConstellation] =
+    useState<SchemaConstellation | null>(null);
+  const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const [savedTab, setSavedTab] = useState<"questions" | "recipes">(
+    "questions",
+  );
+  const [executingRecipeId, setExecutingRecipeId] = useState<string | null>(
+    null,
+  );
+  const [clarificationText, setClarificationText] = useState("");
+  const [submittingClarification, setSubmittingClarification] = useState(false);
+  const [feedbackRating, setFeedbackRating] = useState<number | null>(null);
+  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
+  const [copiedSql, setCopiedSql] = useState(false);
+
   const { questions, updateQuestions } = useQuestions();
   const readingRef = useRef(false);
+
+  const activeConnection = connections.find((c) => c.id === activeConnectionId);
   const selectedDocument = documents.find(
     (document) => document.id === selectedId,
   );
-  const source = selectedDocument?.name ?? "Choose a source";
+  const source = selectedDocument
+    ? selectedDocument.name
+    : activeConnection
+      ? `${activeConnection.name} (PostgreSQL)`
+      : "Choose a source";
 
   useEffect(() => {
     const controller = new AbortController();
     fetch("/api/status", { signal: controller.signal, cache: "no-store" })
       .then(async (response) => {
         const body: unknown = await response.json();
-        setApiStatus(
+        const online =
           response.ok &&
-            typeof body === "object" &&
-            body !== null &&
-            "status" in body &&
-            body.status === "online"
-            ? "online"
-            : "offline",
-        );
+          typeof body === "object" &&
+          body !== null &&
+          "status" in body &&
+          body.status === "online";
+        setApiStatus(online ? "online" : "offline");
+        if (online) {
+          getConnections()
+            .then((list) => {
+              setConnections(list);
+              if (list.length > 0) {
+                setActiveConnectionId(
+                  (current) => current ?? list[0]?.id ?? null,
+                );
+              }
+            })
+            .catch(() => void 0);
+
+          getRecipes()
+            .then(setRecipes)
+            .catch(() => void 0);
+        }
       })
       .catch(() => {
         if (!controller.signal.aborted) setApiStatus("offline");
       });
     return () => controller.abort();
   }, [statusVersion]);
+
+  useEffect(() => {
+    if (activeConnectionId && apiStatus === "online") {
+      getSchemaConstellation(activeConnectionId)
+        .then(setConstellation)
+        .catch(() => setConstellation(null));
+    }
+  }, [activeConnectionId, apiStatus]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -136,25 +210,241 @@ export function Workspace() {
     );
   }
 
+  async function pollRunUntilTerminal(questionId: string, runId: string) {
+    const terminalStatuses = new Set([
+      "answered",
+      "completed",
+      "needs_clarification",
+      "abstained",
+      "blocked_by_policy",
+      "execution_failed",
+      "timed_out",
+      "cancelled",
+    ]);
+
+    let activeRun = await getRun(runId);
+    while (!terminalStatuses.has(activeRun.status)) {
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      activeRun = await getRun(runId);
+      updateQuestions((current) =>
+        current.map((q) =>
+          q.id === questionId ? { ...q, status: activeRun.status } : q,
+        ),
+      );
+      setQuestion((curr) =>
+        curr?.id === questionId ? { ...curr, status: activeRun.status } : curr,
+      );
+    }
+
+    if (activeRun.status === "answered") {
+      const [resResult, resEvidence, resLedger, resRadar, resCf, resPassport] =
+        await Promise.allSettled([
+          getRunResult(runId),
+          getRunEvidence(runId),
+          getTruthLedger(runId),
+          getDirtyRadar(runId),
+          getCounterfactuals(runId),
+          getQueryCostPassport(runId),
+        ]);
+
+      const updatedFields = {
+        status: activeRun.status,
+        result: resResult.status === "fulfilled" ? resResult.value : undefined,
+        evidence:
+          resEvidence.status === "fulfilled" ? resEvidence.value : undefined,
+        ledger: resLedger.status === "fulfilled" ? resLedger.value : undefined,
+        radar: resRadar.status === "fulfilled" ? resRadar.value : undefined,
+        counterfactuals: resCf.status === "fulfilled" ? resCf.value : undefined,
+        passport:
+          resPassport.status === "fulfilled" ? resPassport.value : undefined,
+      };
+
+      updateQuestions((current) =>
+        current.map((q) =>
+          q.id === questionId ? { ...q, ...updatedFields } : q,
+        ),
+      );
+      setQuestion((curr) =>
+        curr?.id === questionId ? { ...curr, ...updatedFields } : curr,
+      );
+      setNotice("Analysis verified and completed.");
+    } else if (activeRun.status === "needs_clarification") {
+      setNotice("The orchestrator requires clarification to proceed.");
+    } else if (activeRun.status === "blocked_by_policy") {
+      setNotice("Analysis blocked by database security policy.");
+    }
+  }
+
+  async function executeAnalysisRequest(
+    questionId: string,
+    userPrompt: string,
+    connId: string,
+    parentRunId?: string,
+  ) {
+    try {
+      const run = await submitAnalysis({
+        connectionId: connId,
+        question: userPrompt,
+        parentRunId,
+      });
+
+      updateQuestions((current) =>
+        current.map((q) =>
+          q.id === questionId
+            ? { ...q, runId: run.runId, status: run.status }
+            : q,
+        ),
+      );
+      setQuestion((curr) =>
+        curr?.id === questionId
+          ? { ...curr, runId: run.runId, status: run.status }
+          : curr,
+      );
+
+      await pollRunUntilTerminal(questionId, run.runId);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Analysis request failed.";
+      updateQuestions((current) =>
+        current.map((q) =>
+          q.id === questionId ? { ...q, status: "execution_failed" } : q,
+        ),
+      );
+      setQuestion((curr) =>
+        curr?.id === questionId
+          ? { ...curr, status: "execution_failed" }
+          : curr,
+      );
+      setNotice(message);
+    }
+  }
+
   function submitQuestion() {
     if (!prompt.trim()) return;
+    const userText = prompt.trim();
+    const canAnalyze =
+      apiStatus === "online" && activeConnectionId && !selectedDocument;
+
     const draft: Question = {
       id: crypto.randomUUID(),
-      text: prompt.trim(),
+      text: userText,
       mode,
-      source: selectedDocument?.name ?? "No source selected",
+      source,
       createdAt: Date.now(),
       saved: false,
+      status: canAnalyze ? "planning" : undefined,
+      connectionId: canAnalyze ? activeConnectionId : undefined,
     };
+
     const stored = updateQuestions((current) => [draft, ...current]);
     if (!stored)
       setNotice(
         "Browser storage is unavailable. This question will only stay open in this session.",
       );
+
     setQuestion(draft);
     setQuestionTab("Overview");
     setView("All analyses");
     setPrompt("");
+    setFeedbackRating(null);
+    setFeedbackSubmitted(false);
+
+    if (canAnalyze && activeConnectionId) {
+      void executeAnalysisRequest(draft.id, userText, activeConnectionId);
+    }
+  }
+
+  async function handleClarification() {
+    if (!clarificationText.trim() || !question) return;
+    const input = clarificationText.trim();
+    setClarificationText("");
+    setSubmittingClarification(true);
+    const connId = question.connectionId ?? activeConnectionId;
+    if (!connId) {
+      setNotice("No database connection available for clarification.");
+      setSubmittingClarification(false);
+      return;
+    }
+    try {
+      await executeAnalysisRequest(question.id, input, connId, question.runId);
+    } finally {
+      setSubmittingClarification(false);
+    }
+  }
+
+  async function handleExecuteRecipe(r: Recipe) {
+    setExecutingRecipeId(r.id);
+    try {
+      const res = await executeRecipe(r.id);
+      const draft: Question = {
+        id: crypto.randomUUID(),
+        text: r.question,
+        mode: "Ask your data",
+        source: r.name,
+        createdAt: Date.now(),
+        saved: true,
+        status: res.status,
+        runId: res.runId,
+        connectionId: r.connectionId,
+      };
+      updateQuestions((current) => [draft, ...current]);
+      setQuestion(draft);
+      setQuestionTab("Overview");
+      setView("All analyses");
+      await pollRunUntilTerminal(draft.id, res.runId);
+    } catch (err) {
+      setNotice(
+        err instanceof Error ? err.message : "Failed to execute recipe.",
+      );
+    } finally {
+      setExecutingRecipeId(null);
+    }
+  }
+
+  async function handleFeedback(rating: number) {
+    if (!question?.runId) return;
+    setFeedbackRating(rating);
+    try {
+      await submitFeedback({
+        runId: question.runId,
+        rating,
+        category: "correctness",
+        comment: "Analyst verified feedback from workspace",
+      });
+      setFeedbackSubmitted(true);
+      setNotice("Feedback submitted.");
+    } catch {
+      setNotice("Could not submit feedback.");
+    }
+  }
+
+  async function handleReviewAnomaly(
+    anomalyId: string,
+    state: "accepted" | "rejected",
+  ) {
+    if (!question?.runId || !question.radar) return;
+    try {
+      await reviewRadarAnomaly(question.runId, anomalyId, state);
+      const updatedAnomalies = question.radar.anomalies.map((a) =>
+        a.id === anomalyId ? { ...a, reviewState: state } : a,
+      );
+      const updatedRadar = { ...question.radar, anomalies: updatedAnomalies };
+      setQuestion((curr) => (curr ? { ...curr, radar: updatedRadar } : curr));
+      updateQuestions((current) =>
+        current.map((q) =>
+          q.id === question.id ? { ...q, radar: updatedRadar } : q,
+        ),
+      );
+      setNotice(`Anomaly marked as ${state}.`);
+    } catch {
+      setNotice("Could not record anomaly review.");
+    }
+  }
+
+  function handleCopySql(sqlText: string) {
+    void navigator.clipboard.writeText(sqlText);
+    setCopiedSql(true);
+    setTimeout(() => setCopiedSql(false), 2000);
   }
 
   function removeQuestion(id: string) {
@@ -264,6 +554,16 @@ export function Workspace() {
     item.name.toLowerCase().includes(filter.toLowerCase()),
   );
 
+  const availableTabs = [
+    "Overview",
+    "SQL",
+    "Results",
+    "Truth Ledger",
+    "Dirty Radar",
+    "Counterfactuals",
+    "Cost Passport",
+  ];
+
   return (
     <div className="workspace">
       <a className="skip-link" href="#main-content">
@@ -323,9 +623,12 @@ export function Workspace() {
                       {questions.filter((item) => item.saved).length}
                     </span>
                   )}
-                {item.label === "Data sources" && documents.length > 0 && (
-                  <span className="nav-count">{documents.length}</span>
-                )}
+                {item.label === "Data sources" &&
+                  (connections.length > 0 || documents.length > 0) && (
+                    <span className="nav-count">
+                      {connections.length + documents.length}
+                    </span>
+                  )}
               </button>
             </div>
           ))}
@@ -366,10 +669,17 @@ export function Workspace() {
             <span className="avatar">Y</span>
             <span>
               <strong>{workspaceName}</strong>
-              <small>Local workspace</small>
+              <small>
+                {apiStatus === "online" ? "Connected workspace" : "Offline"}
+              </small>
             </span>
             <Icon name="down" size={15} />
           </button>
+          <div className="sidebar-legal-links">
+            <Link href="/privacy">Privacy Policy</Link>
+            <span>·</span>
+            <Link href="/terms">Terms</Link>
+          </div>
         </div>
       </aside>
       <div className="workspace-main">
@@ -452,13 +762,22 @@ export function Workspace() {
                   <p>{descriptions[view]}</p>
                 </div>
                 {view === "Data sources" ? (
-                  <button
-                    className="button button-dark"
-                    onClick={() => setModal("files")}
-                  >
-                    <Icon name="plus" size={16} />
-                    Add source
-                  </button>
+                  <div style={{ display: "flex", gap: 10 }}>
+                    <button
+                      className="button"
+                      onClick={() => setModal("connection")}
+                    >
+                      <Icon name="link" size={16} />
+                      Manage connections
+                    </button>
+                    <button
+                      className="button button-dark"
+                      onClick={() => setModal("files")}
+                    >
+                      <Icon name="plus" size={16} />
+                      Add file
+                    </button>
+                  </div>
                 ) : (
                   (view === "All analyses" || view === "Saved questions") && (
                     <button
@@ -496,12 +815,28 @@ export function Workspace() {
                       </button>
                     </div>
                     <div className="document-meta">
-                      <span className="badge">Draft · Not executed</span>
+                      <span
+                        className="badge"
+                        style={{
+                          background:
+                            question.status === "completed" ||
+                            question.status === "answered"
+                              ? "#daf0db"
+                              : question.status === "needs_clarification"
+                                ? "#fdedcb"
+                                : "#edf2e6",
+                        }}
+                      >
+                        {question.status
+                          ? question.status.replace(/_/g, " ")
+                          : "Draft · Not executed"}
+                      </span>
                       <span>{question.mode}</span>
                       <span>{question.source}</span>
                     </div>
+
                     <div className="filter-tabs">
-                      {["Overview", "SQL", "Results", "Evidence"].map((tab) => (
+                      {availableTabs.map((tab) => (
                         <button
                           key={tab}
                           className={questionTab === tab ? "active" : ""}
@@ -512,28 +847,299 @@ export function Workspace() {
                         </button>
                       ))}
                     </div>
-                    <EmptyState
-                      icon={
-                        questionTab === "SQL"
-                          ? "code"
-                          : questionTab === "Evidence"
-                            ? "shield"
-                            : questionTab === "Results"
-                              ? "chart"
-                              : "sparkles"
-                      }
-                      title={
-                        questionTab === "Overview"
-                          ? "Your question is ready. The analysis service isn’t yet."
-                          : `No ${questionTab.toLowerCase()} generated yet`
-                      }
-                    >
-                      The backend currently supports health checks. Running
-                      questions, generating SQL, and verifying answers require
-                      the analysis API. Your question is kept as a draft; no
-                      query has been executed.
-                    </EmptyState>
-                    <div className="analysis-actions">
+
+                    {questionTab === "Overview" && (
+                      <div>
+                        {question.status === "needs_clarification" && (
+                          <div className="clarification-callout">
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 8,
+                                color: "#925700",
+                              }}
+                            >
+                              <Icon name="help" size={18} />
+                              <strong>
+                                Orchestrator clarification requested:
+                              </strong>
+                            </div>
+                            <p
+                              style={{
+                                margin: "8px 0",
+                                fontSize: 13,
+                                color: "#544321",
+                              }}
+                            >
+                              The question involves ambiguous metric dimensions
+                              or unspecified filters. Please provide additional
+                              clarification to guide execution.
+                            </p>
+                            <form
+                              className="clarification-form"
+                              onSubmit={(e) => {
+                                e.preventDefault();
+                                void handleClarification();
+                              }}
+                            >
+                              <input
+                                placeholder="E.g. Include tax discounts and restrict to calendar year 2024"
+                                value={clarificationText}
+                                onChange={(e) =>
+                                  setClarificationText(e.target.value)
+                                }
+                              />
+                              <button
+                                className="button button-dark"
+                                type="submit"
+                                disabled={submittingClarification}
+                              >
+                                {submittingClarification
+                                  ? "Submitting…"
+                                  : "Submit Clarification"}
+                              </button>
+                            </form>
+                          </div>
+                        )}
+
+                        {question.result?.answer ? (
+                          <div
+                            className="claim-card"
+                            style={{ margin: "16px 0", padding: 20 }}
+                          >
+                            <span className="eyebrow">VERIFIED ANSWER</span>
+                            <p
+                              style={{
+                                font: "18px/1.6 Georgia, serif",
+                                color: "#2d3e26",
+                                margin: "10px 0",
+                              }}
+                            >
+                              {question.result.answer.status === "answered"
+                                ? question.result.answer.answerText
+                                : question.result.answer.reason}
+                            </p>
+                          </div>
+                        ) : (
+                          <EmptyState
+                            icon="sparkles"
+                            title={
+                              question.status === "planning" ||
+                              question.status === "executing"
+                                ? "Analysis in progress…"
+                                : "Draft analysis question"
+                            }
+                          >
+                            {question.status === "planning" ||
+                            question.status === "executing"
+                              ? "Metis is inspecting the schema constellation, generating AST-verified SQL, and gathering evidence."
+                              : "This question has not executed against an active database connection. Select an active connection and submit to generate verified results."}
+                          </EmptyState>
+                        )}
+
+                        {question.runId && (
+                          <div className="feedback-container">
+                            <span style={{ fontSize: 12, color: "#4f6345" }}>
+                              Rate analysis accuracy:
+                            </span>
+                            <div style={{ display: "flex", gap: 6 }}>
+                              <button
+                                className={`button ${feedbackRating === 5 ? "button-dark" : ""}`}
+                                style={{ padding: "4px 8px" }}
+                                onClick={() => handleFeedback(5)}
+                              >
+                                <Icon name="thumbsUp" size={14} />
+                              </button>
+                              <button
+                                className={`button ${feedbackRating === 1 ? "button-dark" : ""}`}
+                                style={{ padding: "4px 8px" }}
+                                onClick={() => handleFeedback(1)}
+                              >
+                                <Icon name="thumbsDown" size={14} />
+                              </button>
+                            </div>
+                            {feedbackSubmitted && (
+                              <span
+                                style={{
+                                  fontSize: 11,
+                                  color: "#376d3a",
+                                  marginLeft: "auto",
+                                }}
+                              >
+                                Feedback recorded
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {questionTab === "SQL" && (
+                      <div>
+                        {question.evidence?.finalStatus === "answered" &&
+                        question.evidence.candidate.sqlText ? (
+                          <div className="sql-viewer-box">
+                            <div className="sql-actions-top">
+                              <span className="sql-ast-badge">
+                                <Icon name="shield" size={12} />
+                                AST read-only verified
+                              </span>
+                              <button
+                                className="button"
+                                style={{
+                                  background: "#334230",
+                                  borderColor: "#4a5d46",
+                                  color: "#f0f6ec",
+                                  padding: "3px 8px",
+                                  fontSize: 11,
+                                }}
+                                onClick={() =>
+                                  handleCopySql(
+                                    question.evidence?.finalStatus ===
+                                      "answered"
+                                      ? question.evidence.candidate.sqlText
+                                      : "",
+                                  )
+                                }
+                              >
+                                <Icon
+                                  name={copiedSql ? "check" : "copy"}
+                                  size={13}
+                                />
+                                {copiedSql ? "Copied" : "Copy SQL"}
+                              </button>
+                            </div>
+                            <pre style={{ margin: 0 }}>
+                              <code>{question.evidence.candidate.sqlText}</code>
+                            </pre>
+                          </div>
+                        ) : question.result?.answer.status === "answered" &&
+                          question.result.answer.sqlReference ? (
+                          <div className="sql-viewer-box">
+                            <div className="sql-actions-top">
+                              <span className="sql-ast-badge">
+                                <Icon name="shield" size={12} />
+                                AST read-only verified
+                              </span>
+                              <button
+                                className="button"
+                                style={{
+                                  background: "#334230",
+                                  borderColor: "#4a5d46",
+                                  color: "#f0f6ec",
+                                  padding: "3px 8px",
+                                  fontSize: 11,
+                                }}
+                                onClick={() =>
+                                  handleCopySql(
+                                    question.result?.answer.status ===
+                                      "answered"
+                                      ? question.result.answer.sqlReference
+                                      : "",
+                                  )
+                                }
+                              >
+                                <Icon
+                                  name={copiedSql ? "check" : "copy"}
+                                  size={13}
+                                />
+                                {copiedSql ? "Copied" : "Copy SQL"}
+                              </button>
+                            </div>
+                            <pre style={{ margin: 0 }}>
+                              <code>{question.result.answer.sqlReference}</code>
+                            </pre>
+                          </div>
+                        ) : (
+                          <EmptyState icon="code" title="No SQL generated yet">
+                            SQL generation occurs upon execution against an
+                            active PostgreSQL connection.
+                          </EmptyState>
+                        )}
+                      </div>
+                    )}
+
+                    {questionTab === "Results" && (
+                      <div>
+                        {question.result ? (
+                          <ResultsTable result={question.result} />
+                        ) : (
+                          <EmptyState
+                            icon="chart"
+                            title="No query results available"
+                          >
+                            Tabular results will appear after SQL execution
+                            completes.
+                          </EmptyState>
+                        )}
+                      </div>
+                    )}
+
+                    {questionTab === "Truth Ledger" && (
+                      <div>
+                        <LedgerView
+                          documents={documents}
+                          ledger={question.ledger}
+                          onUpload={() => setModal("files")}
+                        />
+                      </div>
+                    )}
+
+                    {questionTab === "Dirty Radar" && (
+                      <div>
+                        {question.radar ? (
+                          <DirtyRadarView
+                            radar={question.radar}
+                            onReviewAnomaly={handleReviewAnomaly}
+                          />
+                        ) : (
+                          <EmptyState
+                            icon="radar"
+                            title="Dirty Radar not evaluated"
+                          >
+                            Run an analysis to scan columns for unexpected null
+                            spikes, extreme outliers, and pattern drift.
+                          </EmptyState>
+                        )}
+                      </div>
+                    )}
+
+                    {questionTab === "Counterfactuals" && (
+                      <div>
+                        {question.counterfactuals ? (
+                          <CounterfactualView
+                            counterfactuals={question.counterfactuals}
+                          />
+                        ) : (
+                          <EmptyState
+                            icon="layers"
+                            title="Counterfactual comparison unavailable"
+                          >
+                            Counterfactual variants explore sensitivity across
+                            different assumptions and period definitions.
+                          </EmptyState>
+                        )}
+                      </div>
+                    )}
+
+                    {questionTab === "Cost Passport" && (
+                      <div>
+                        {question.passport ? (
+                          <PassportView passport={question.passport} />
+                        ) : (
+                          <EmptyState
+                            icon="clock"
+                            title="Query Cost Passport not measured"
+                          >
+                            Query duration, row limits, and model call metrics
+                            will be tracked when executed.
+                          </EmptyState>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="analysis-actions" style={{ marginTop: 24 }}>
                       <button
                         className="button"
                         onClick={() => {
@@ -551,65 +1157,129 @@ export function Workspace() {
                         Refine question
                         <Icon name="arrow" size={15} />
                       </button>
-                      <button
-                        className="button"
-                        onClick={() =>
-                          downloadText(
-                            "metis-question.txt",
-                            `${question.text}\n\nMode: ${question.mode}\nSource: ${question.source}\nStatus: Draft, not executed\n`,
-                          )
-                        }
-                      >
-                        <Icon name="download" size={15} />
-                        Export question
-                      </button>
+
+                      {question.runId ? (
+                        <>
+                          <a
+                            className="button"
+                            href={getExportUrl(question.runId, "csv")}
+                            download
+                          >
+                            <Icon name="download" size={15} />
+                            Export CSV
+                          </a>
+                          <a
+                            className="button"
+                            href={getExportUrl(question.runId, "sql")}
+                            download
+                          >
+                            <Icon name="download" size={15} />
+                            Export SQL
+                          </a>
+                          <a
+                            className="button"
+                            href={getExportUrl(
+                              question.runId,
+                              "reproducibility",
+                            )}
+                            download
+                          >
+                            <Icon name="download" size={15} />
+                            Reproducibility Bundle
+                          </a>
+                        </>
+                      ) : (
+                        <button
+                          className="button"
+                          onClick={() =>
+                            downloadText(
+                              "metis-question.txt",
+                              `${question.text}\n\nMode: ${question.mode}\nSource: ${question.source}\nStatus: Draft, not executed\n`,
+                            )
+                          }
+                        >
+                          <Icon name="download" size={15} />
+                          Export question
+                        </button>
+                      )}
                     </div>
                   </section>
                 ) : (
                   <section className="panel">
-                    <div className="section-heading">
-                      <h2>
-                        {view === "Saved questions"
-                          ? "Your collection"
-                          : "Question history"}
-                        <span className="count-pill">
-                          {matchingQuestions.length}
-                        </span>
-                      </h2>
-                      <label className="inline-search">
-                        <Icon name="search" size={16} />
-                        <input
-                          aria-label="Filter questions"
-                          placeholder="Find a question…"
-                          value={filter}
-                          onChange={(event) => setFilter(event.target.value)}
-                        />
-                      </label>
-                    </div>
-                    {matchingQuestions.length ? (
-                      <QuestionList
-                        questions={matchingQuestions}
-                        onOpen={openQuestion}
-                        onSave={toggleSaved}
-                        onRemove={removeQuestion}
+                    {view === "Saved questions" && (
+                      <div className="filter-tabs" style={{ marginBottom: 16 }}>
+                        <button
+                          className={savedTab === "questions" ? "active" : ""}
+                          onClick={() => setSavedTab("questions")}
+                        >
+                          Bookmarked Questions
+                        </button>
+                        <button
+                          className={savedTab === "recipes" ? "active" : ""}
+                          onClick={() => setSavedTab("recipes")}
+                        >
+                          Analysis Recipes ({recipes.length})
+                        </button>
+                      </div>
+                    )}
+
+                    {view === "Saved questions" && savedTab === "recipes" ? (
+                      <RecipesView
+                        recipes={recipes}
+                        onExecute={handleExecuteRecipe}
+                        executingId={executingRecipeId}
                       />
                     ) : (
-                      <EmptyState
-                        icon={view === "Saved questions" ? "bookmark" : "chat"}
-                        title={
-                          filter
-                            ? "No matching questions"
-                            : view === "Saved questions"
-                              ? "Keep your best questions close"
-                              : "Curiosity looks good here"
-                        }
-                      >
-                        {filter
-                          ? "Try a different word or clear the search."
-                          : view === "Saved questions"
-                            ? "Use the bookmark next to any question to add it to your collection."
-                            : "Ask a question from Home to create your first draft. Questions stay in this browser."}
-                      </EmptyState>
+                      <>
+                        <div className="section-heading">
+                          <h2>
+                            {view === "Saved questions"
+                              ? "Your collection"
+                              : "Question history"}
+                            <span className="count-pill">
+                              {matchingQuestions.length}
+                            </span>
+                          </h2>
+                          <label className="inline-search">
+                            <Icon name="search" size={16} />
+                            <input
+                              aria-label="Filter questions"
+                              placeholder="Find a question…"
+                              value={filter}
+                              onChange={(event) =>
+                                setFilter(event.target.value)
+                              }
+                            />
+                          </label>
+                        </div>
+                        {matchingQuestions.length ? (
+                          <QuestionList
+                            questions={matchingQuestions}
+                            onOpen={openQuestion}
+                            onSave={toggleSaved}
+                            onRemove={removeQuestion}
+                          />
+                        ) : (
+                          <EmptyState
+                            icon={
+                              view === "Saved questions" ? "bookmark" : "chat"
+                            }
+                            title={
+                              filter
+                                ? "No matching questions"
+                                : view === "Saved questions"
+                                  ? "Keep your best questions close"
+                                  : "Curiosity looks good here"
+                            }
+                          >
+                            {filter
+                              ? "Try a different word or clear the search."
+                              : view === "Saved questions"
+                                ? "Use the bookmark next to any question to add it to your collection."
+                                : "Ask a question from Home to create your first analysis."}
+                          </EmptyState>
+                        )}
+                      </>
                     )}
                   </section>
                 ))}
@@ -621,10 +1291,15 @@ export function Workspace() {
                       <Icon name="database" size={27} />
                     </span>
                     <div>
-                      <h3>Connect the bigger picture.</h3>
+                      <h3>
+                        {activeConnection
+                          ? `Connected to ${activeConnection.name}`
+                          : "Connect the bigger picture."}
+                      </h3>
                       <p>
-                        Explore files now. Bring a read-only PostgreSQL source
-                        when the connection service is ready.
+                        {activeConnection
+                          ? `PostgreSQL read-only source with ${activeConnection.allowedSchemas.length} authorized schema(s).`
+                          : "Configure a read-only PostgreSQL data source or explore local files."}
                       </p>
                     </div>
                     <button
@@ -632,7 +1307,7 @@ export function Workspace() {
                       onClick={() => setModal("connection")}
                     >
                       <Icon name="link" size={16} />
-                      Database connections
+                      Database connections ({connections.length})
                     </button>
                   </div>
                   <section className="panel">
@@ -685,13 +1360,22 @@ export function Workspace() {
               {view === "Schema explorer" && (
                 <SchemaView
                   documents={documents}
+                  constellation={constellation}
                   onUpload={() => setModal("files")}
                   onOpen={setPreview}
+                  onRefreshConstellation={() => {
+                    if (activeConnectionId) {
+                      getSchemaConstellation(activeConnectionId)
+                        .then(setConstellation)
+                        .catch(() => void 0);
+                    }
+                  }}
                 />
               )}
               {view === "Truth Ledger" && (
                 <LedgerView
                   documents={documents}
+                  ledger={question?.ledger}
                   onUpload={() => setModal("files")}
                 />
               )}
@@ -743,6 +1427,23 @@ export function Workspace() {
       )}
       {modal === "connection" && (
         <ConnectionDialog
+          connections={connections}
+          activeConnectionId={activeConnectionId}
+          onSelectConnection={(id) => {
+            setActiveConnectionId(id);
+            setModal(null);
+            setNotice("Active database connection updated.");
+          }}
+          onConnectionCreated={(conn) => {
+            setConnections((curr) => [...curr, conn]);
+            setActiveConnectionId(conn.id);
+            setNotice(`Connected to ${conn.name}.`);
+          }}
+          onConnectionRevoked={(id) => {
+            setConnections((curr) => curr.filter((c) => c.id !== id));
+            if (activeConnectionId === id) setActiveConnectionId(null);
+            setNotice("Database connection revoked.");
+          }}
           onClose={() => setModal(null)}
           onFiles={() => setModal("files")}
         />
@@ -763,6 +1464,7 @@ export function Workspace() {
           apiStatus={apiStatus}
           documents={documents}
           questions={questions}
+          activeConnectionName={activeConnection?.name}
           onClose={() => setModal(null)}
         />
       )}

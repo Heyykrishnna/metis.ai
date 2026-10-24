@@ -1,3 +1,12 @@
+import type {
+  Result,
+  EvidenceBundle,
+  TruthLedger,
+  QueryCostPassport,
+  DirtyRadarReport,
+  CounterfactualReport,
+} from "./api-client";
+
 export type Question = {
   id: string;
   text: string;
@@ -5,6 +14,15 @@ export type Question = {
   source: string;
   createdAt: number;
   saved: boolean;
+  runId?: string;
+  status?: string;
+  connectionId?: string;
+  result?: Result;
+  evidence?: EvidenceBundle;
+  ledger?: TruthLedger;
+  passport?: QueryCostPassport;
+  radar?: DirtyRadarReport;
+  counterfactuals?: CounterfactualReport;
 };
 
 export const templates = [
