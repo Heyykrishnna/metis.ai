@@ -691,8 +691,8 @@ export async function answerFile(
               data.text.length > 18000
                 ? ["Search context was limited to the first 18,000 characters."]
                 : [
-                    "Extractive answer: source passages may require further interpretation.",
-                  ],
+                  "Extractive answer: source passages may require further interpretation.",
+                ],
           },
           columns: ["excerpt"],
           rows: response.quotes.map((excerpt) => ({ excerpt })),
@@ -777,7 +777,7 @@ export async function answerFile(
   if (plan.operation === "clarify" || plan.clarification.trim())
     return nonAnswer(
       plan.clarification ||
-        "Which metric, grouping, and time period should I use?",
+      "Which metric, grouping, and time period should I use?",
     );
   if (
     [
@@ -797,10 +797,10 @@ export async function answerFile(
   let executable: Plan =
     asksSkewness(question) && plan.operation !== "skewness"
       ? {
-          ...plan,
-          operation: "skewness",
-          column: plan.column ?? namedColumn(question, data.columns),
-        }
+        ...plan,
+        operation: "skewness",
+        column: plan.column ?? namedColumn(question, data.columns),
+      }
       : plan;
   const limitations: string[] = [];
   let columns: string[] = [];
@@ -970,9 +970,9 @@ export async function answerFile(
         );
       const groupColumn =
         executable.groupBy &&
-        ["value", "shape", "included_rows", "excluded_empty_rows"].includes(
-          executable.groupBy,
-        )
+          ["value", "shape", "included_rows", "excluded_empty_rows"].includes(
+            executable.groupBy,
+          )
           ? `group: ${executable.groupBy}`
           : executable.groupBy;
       columns = [
@@ -1101,8 +1101,8 @@ export async function answerFile(
           "Numeric aggregates use 50-digit decimal precision and return decimal strings. Results beyond that precision are rounded; currency formatting is not inferred.",
           ...(executable.operation === "skewness"
             ? [
-                "Skewness is the Fisher-Pearson sample coefficient (Excel SKEW / pandas default). Positive values are right-skewed; negative values are left-skewed.",
-              ]
+              "Skewness is the Fisher-Pearson sample coefficient (Excel SKEW / pandas default). Positive values are right-skewed; negative values are left-skewed.",
+            ]
             : []),
         ],
         limitations,
