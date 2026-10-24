@@ -26,6 +26,8 @@ Every completed analysis is an inspectable record, not a chat reply:
 
 If a definition is ambiguous, metis.ai asks one focused question instead of guessing. If verification fails, it abstains.
 
+The full architecture, analysis process, numeric formulas, safety algorithm, measured scorecard, and comparison with generic LLMs are in [How metis.ai works](docs/how-metis-works.md).
+
 ## Principles
 
 **Evidence before fluency.** A well-written answer is not a correct answer.
@@ -65,7 +67,7 @@ The configured local Qwen model must be installed in Ollama; see [inference conf
 
 ## Working file workflow
 
-Upload CSV, JSON, TXT or Markdown, select it as the source and ask a question. Files persist in Neon as Brotli-compressed original bytes with SHA-256 integrity checks. Table questions use validated plans and server-side calculations over all validated records. Answers, evidence and history survive refresh. Unsupported or ambiguous questions receive a clarification or abstention. External SQL analysis requires a separately configured read-only analytical adapter; the metadata owner connection is never reused for arbitrary analytical queries.
+Upload CSV, JSON, TXT or Markdown, select it as the source and ask a question. Files persist in Neon as Brotli-compressed original bytes with SHA-256 integrity checks. Table questions use validated plans and server-side calculations over all validated records, including left/right skewness. Answers, evidence and history survive refresh. Unsupported or ambiguous questions receive a clarification or abstention. External SQL analysis requires a separately configured read-only analytical adapter; the metadata owner connection is never reused for arbitrary analytical queries.
 
 ## Validation
 

@@ -3,6 +3,7 @@ import type { FileAnalysis } from "../src/lib/file-client";
 import {
   fileCoverage,
   normalizeFileAnalysis,
+  operationLabel,
   readFilePlan,
 } from "../src/lib/file-presentation";
 
@@ -50,6 +51,27 @@ it("measures coverage from actual included and excluded rows", () => {
     excluded: 1,
     unit: "matching metric rows",
   });
+  expect(
+    fileCoverage(
+      analysis([
+        {
+          value: "1.73",
+          shape: "right-skewed",
+          included_rows: 3,
+          excluded_empty_rows: 1,
+        },
+      ]),
+    ),
+  ).toEqual({
+    percent: 75,
+    included: 3,
+    excluded: 1,
+    unit: "matching metric rows",
+  });
+});
+
+it("labels skewness as a distribution calculation", () => {
+  expect(operationLabel("skewness")).toBe("Skewness");
 });
 
 it("does not invent a confidence score when data coverage is unavailable", () => {

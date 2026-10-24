@@ -13,7 +13,7 @@ Open `http://127.0.0.1:3005`. The server-side proxy connects to the API at `http
 
 - Upload or drop CSV, JSON, TXT and Markdown files; preview tables and inspect columns and missing values.
 - Persist original file bytes with Brotli compression in Neon. Reload stored files and their saved answers after refresh, download byte-exact originals, or delete a file and its associated analyses.
-- Select a file and ask a question. Table operations include structure, counts, numeric aggregates, grouping and filters. Text answers are verified source excerpts. Unsupported requests produce clarification or abstention; inference outages are visible.
+- Select a file and ask a question. Table operations include structure, counts, numeric aggregates, left/right skewness, grouping and filters. Text answers are verified source excerpts. Unsupported requests produce clarification or abstention; inference outages are visible.
 - Inspect structured file answers, supporting row previews, readable calculation definitions and source evidence. Clarifications show the actual unresolved question, selectable source fields and a labeled reply form.
 - Open the Schema tab to inspect all source fields or run a full-file schema profile with observed types, nullability and empty counts. Data-coverage bars reflect measured nonempty rows/cells; they are not model confidence probabilities.
 - Inspect computed rows, source hashes, methods, definitions and limitations. File calculations do not claim to have executed SQL.

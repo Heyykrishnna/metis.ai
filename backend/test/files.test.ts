@@ -206,14 +206,14 @@ it("does not present a plan requesting clarification as an answered calculation"
   const result = await answerFile(
     file(),
     parseFile("revenue.csv", source),
-    "Is revenue left or right skewed?",
+    "How should I compare these revenue figures?",
     randomUUID(),
     planner({
       operation: "describe",
       column: "revenue",
       groupBy: null,
       filters: [],
-      clarification: "Which distribution measure should I use?",
+      clarification: "Which comparison and time period should I use?",
     }),
   );
   expect(result.result.answer.status).toBe("needs_clarification");
@@ -264,7 +264,7 @@ it("profiles schema types across records beyond the display preview", async () =
   });
 });
 
-it("refuses to substitute an average for a skewness question", async () => {
+it("answers whether a named numeric column is left or right skewed", async () => {
   const result = await answerFile(
     file(),
     parseFile("revenue.csv", source),
@@ -278,6 +278,82 @@ it("refuses to substitute an average for a skewness question", async () => {
       clarification: "",
     }),
   );
+  expect(result.result.answer.status).toBe("answered");
+  expect(
+    result.result.answer.status === "answered" &&
+      result.result.answer.answerText,
+  ).toMatch(/right-skewed/i);
+  expect(result.result.rows).toEqual([
+    {
+      value: expect.stringMatching(/^1\.73/),
+      shape: "right-skewed",
+      included_rows: 3,
+      excluded_empty_rows: 1,
+    },
+  ]);
+  expect(result.result.rows[0]?.value).not.toBe(
+    "6.766666666666666666666666666666666666666666666667",
+  );
+});
+
+it("answers left skew and approximately symmetric numeric distributions", async () => {
+  const left = await answerFile(
+    file(),
+    parseFile("left.csv", Buffer.from("amount\n1\n97\n98\n99\n100\n")),
+    "Is the data left or right skewed?",
+    randomUUID(),
+    planner(null),
+  );
+  expect(left.result.answer.status).toBe("answered");
+  expect(left.result.rows).toEqual([
+    {
+      value: expect.stringMatching(/^-2\.23/),
+      shape: "left-skewed",
+      included_rows: 5,
+      excluded_empty_rows: 0,
+    },
+  ]);
+  const symmetric = await answerFile(
+    file(),
+    parseFile("symmetric.csv", Buffer.from("amount\n1\n2\n3\n4\n5\n")),
+    "Is amount skewed?",
+    randomUUID(),
+    planner(null),
+  );
+  expect(symmetric.result.rows).toEqual([
+    {
+      value: "0",
+      shape: "approximately symmetric",
+      included_rows: 5,
+      excluded_empty_rows: 0,
+    },
+  ]);
+});
+
+it("clarifies skewness when too few numeric observations exist", async () => {
+  const result = await answerFile(
+    file(),
+    parseFile("short.csv", Buffer.from("amount\n1\n2\n")),
+    "Is amount skewed?",
+    randomUUID(),
+    planner(null),
+  );
+  expect(result.result.answer.status).toBe("needs_clarification");
+});
+
+it("still abstains from unsupported correlation questions", async () => {
+  const result = await answerFile(
+    file(),
+    parseFile("revenue.csv", source),
+    "What is the correlation of revenue?",
+    randomUUID(),
+    planner({
+      operation: "average",
+      column: "revenue",
+      groupBy: null,
+      filters: [],
+      clarification: "",
+    }),
+  );
   expect(result.result.answer.status).toBe("abstained");
-  expect(result.result.rows).toEqual([]);
 });

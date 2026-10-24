@@ -20,6 +20,7 @@ const fileColumnLabels: Record<string, string> = {
   included_rows: "Rows used",
   excluded_empty_rows: "Empty rows excluded",
   value: "Value",
+  shape: "Distribution",
 };
 
 function Coverage({ analysis }: { analysis: FileAnalysis }) {

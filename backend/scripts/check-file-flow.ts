@@ -52,6 +52,23 @@ try {
   const overviewBody: unknown = overview.json();
   assert(Check(FileAnalysisSchema, overviewBody));
   assert.equal(overviewBody.result.answer.status, "answered");
+  const skew = await app.inject({
+    method: "POST",
+    url: `/v1/files/${id}/analyses`,
+    headers,
+    payload: { question: "Is revenue left or right skewed?" },
+  });
+  assert.equal(skew.statusCode, 200);
+  const skewBody: unknown = skew.json();
+  assert(Check(FileAnalysisSchema, skewBody));
+  assert.equal(skewBody.result.answer.status, "answered");
+  assert.match(
+    skewBody.result.answer.status === "answered"
+      ? skewBody.result.answer.answerText
+      : "",
+    /right-skewed/i,
+  );
+  assert.equal(skewBody.result.rows[0]?.shape, "right-skewed");
   if (process.argv.includes("--model")) {
     const total = await app.inject({
       method: "POST",
@@ -104,7 +121,7 @@ try {
     "Untrusted identities must not access persisted files",
   );
   process.stdout.write(
-    `File flow passed: Neon Brotli storage, byte-exact download, full-file overview, restart persistence, history and access denial${process.argv.includes("--model") ? ", live Qwen planning and exact grouped totals" : ""}.\n`,
+    `File flow passed: Neon Brotli storage, byte-exact download, full-file overview, right-skew answer, restart persistence, history and access denial${process.argv.includes("--model") ? ", live Qwen planning and exact grouped totals" : ""}.\n`,
   );
 } finally {
   if (id) {
