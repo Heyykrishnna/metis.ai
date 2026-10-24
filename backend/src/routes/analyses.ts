@@ -1,12 +1,15 @@
 import type { FastifyPluginAsyncTypebox } from "@fastify/type-provider-typebox";
 import {
   EvidenceBundleSchema,
+  ReproducibilityBundleSchema,
   ResultSchema,
   RunSchema,
   SubmitAnalysisSchema,
+  TruthLedgerSchema,
 } from "../contracts/analysis.js";
 import { ErrorSchema, IdSchema } from "../contracts/common.js";
 import { requireAuth } from "../security/auth.js";
+import { serializeToSafeCsv } from "../security/csv.js";
 import { getMemoryConnection } from "./connections.js";
 
 const runParamsSchema = {
@@ -41,7 +44,14 @@ export const analysisRoutes: FastifyPluginAsyncTypebox = async (app) => {
       const requestId = request.id ?? "req-unknown";
 
       const memoryConn = getMemoryConnection(connectionId, workspaceId);
-      const allowedSchemas = memoryConn?.allowedSchemas ?? ["analytics_clean"];
+      if (!memoryConn || memoryConn.status === "revoked") {
+        return reply.status(404).send({
+          code: "not_found",
+          message: "Connection not found in workspace",
+          requestId,
+        });
+      }
+      const allowedSchemas = memoryConn.allowedSchemas;
 
       try {
         const run = await app.orchestrator.executeAnalysis({
@@ -240,6 +250,166 @@ export const analysisRoutes: FastifyPluginAsyncTypebox = async (app) => {
       try {
         const evidence = await app.orchestrator.getEvidence(runId, workspaceId);
         return reply.send(evidence);
+      } catch (err) {
+        return reply.status(404).send({
+          code: "not_found",
+          message: err instanceof Error ? err.message : "Resource unavailable",
+          requestId,
+        });
+      }
+    },
+  );
+
+  app.get(
+    "/v1/runs/:runId/export/csv",
+    {
+      schema: {
+        params: runParamsSchema,
+      },
+    },
+    async (request, reply) => {
+      const { runId } = request.params as { runId: string };
+      const workspaceId =
+        request.authContext?.workspaceId ??
+        "00000000-0000-4000-8000-000000000001";
+      const requestId = request.id ?? "req-unknown";
+
+      try {
+        const result = await app.orchestrator.getResult(runId, workspaceId);
+        const csvContent = serializeToSafeCsv(result.columns, result.rows);
+
+        reply.header("Content-Type", "text/csv; charset=utf-8");
+        reply.header(
+          "Content-Disposition",
+          `attachment; filename="analysis-${runId}.csv"`,
+        );
+        return reply.send(csvContent);
+      } catch (err) {
+        return reply.status(404).send({
+          code: "not_found",
+          message: err instanceof Error ? err.message : "Resource unavailable",
+          requestId,
+        });
+      }
+    },
+  );
+
+  app.get(
+    "/v1/runs/:runId/export/sql",
+    {
+      schema: {
+        params: runParamsSchema,
+      },
+    },
+    async (request, reply) => {
+      const { runId } = request.params as { runId: string };
+      const workspaceId =
+        request.authContext?.workspaceId ??
+        "00000000-0000-4000-8000-000000000001";
+      const requestId = request.id ?? "req-unknown";
+
+      try {
+        const evidence = await app.orchestrator.getEvidence(runId, workspaceId);
+        if (!evidence.candidate) {
+          return reply.status(404).send({
+            code: "not_found",
+            message: "No SQL query candidate available for run",
+            requestId,
+          });
+        }
+
+        const candidate = evidence.candidate;
+        const now = new Date().toISOString();
+        const sqlExport = [
+          `-- Metis Analytical SQL Export`,
+          `-- Run ID: ${runId}`,
+          `-- Dialect: ${candidate.dialect}`,
+          `-- Exported At: ${now}`,
+          `-- Read-only analytical query`,
+          ``,
+          candidate.sqlText.trim().endsWith(";")
+            ? candidate.sqlText.trim()
+            : `${candidate.sqlText.trim()};`,
+          ``,
+        ].join("\n");
+
+        reply.header("Content-Type", "application/sql; charset=utf-8");
+        reply.header(
+          "Content-Disposition",
+          `attachment; filename="query-${runId}.sql"`,
+        );
+        return reply.send(sqlExport);
+      } catch (err) {
+        return reply.status(404).send({
+          code: "not_found",
+          message: err instanceof Error ? err.message : "Resource unavailable",
+          requestId,
+        });
+      }
+    },
+  );
+
+  app.get(
+    "/v1/runs/:runId/export/reproducibility",
+    {
+      schema: {
+        params: runParamsSchema,
+        response: {
+          200: ReproducibilityBundleSchema,
+          404: ErrorSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const { runId } = request.params as { runId: string };
+      const workspaceId =
+        request.authContext?.workspaceId ??
+        "00000000-0000-4000-8000-000000000001";
+      const requestId = request.id ?? "req-unknown";
+
+      try {
+        const bundle = await app.orchestrator.getReproducibilityBundle(
+          runId,
+          workspaceId,
+        );
+        reply.header("Content-Type", "application/json; charset=utf-8");
+        reply.header(
+          "Content-Disposition",
+          `attachment; filename="reproducibility-${runId}.json"`,
+        );
+        return reply.send(bundle);
+      } catch (err) {
+        return reply.status(404).send({
+          code: "not_found",
+          message: err instanceof Error ? err.message : "Resource unavailable",
+          requestId,
+        });
+      }
+    },
+  );
+
+  app.get(
+    "/v1/runs/:runId/ledger",
+    {
+      schema: {
+        params: runParamsSchema,
+        response: {
+          200: TruthLedgerSchema,
+          404: ErrorSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const { runId } = request.params as { runId: string };
+      const workspaceId =
+        request.authContext?.workspaceId ??
+        "00000000-0000-4000-8000-000000000001";
+      const requestId = request.id ?? "req-unknown";
+
+      try {
+        const ledger = await app.orchestrator.getLedger(runId, workspaceId);
+        reply.header("Content-Type", "application/json; charset=utf-8");
+        return reply.send(ledger);
       } catch (err) {
         return reply.status(404).send({
           code: "not_found",

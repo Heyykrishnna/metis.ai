@@ -11,6 +11,8 @@ import {
   SchemaEvidenceSchema,
   SqlCandidateSchema,
   SubmitAnalysisSchema,
+  TruthLedgerSchema,
+  ReproducibilityBundleSchema,
   VerificationReportSchema,
 } from "./analysis.js";
 import { ErrorSchema, HealthSchema, IdSchema } from "./common.js";
@@ -41,6 +43,8 @@ const apiSchemas = {
   ConnectionTest: ConnectionTestSchema,
   Feedback: FeedbackSchema,
   SubmitAnalysis: SubmitAnalysisSchema,
+  TruthLedger: TruthLedgerSchema,
+  ReproducibilityBundle: ReproducibilityBundleSchema,
   FeedbackReceipt: Type.Object(
     { id: IdSchema },
     { additionalProperties: false },
@@ -120,6 +124,13 @@ export const openApiDocument = {
       ),
       get: operation("listConnections", ref("Connections")),
     },
+    "/v1/connections/{connectionId}": {
+      parameters: [
+        { name: "connectionId", in: "path", required: true, schema: IdSchema },
+      ],
+      get: operation("getConnection", ref("Connection")),
+      delete: operation("revokeConnection", ref("Connection")),
+    },
     "/v1/analyses": {
       post: operation(
         "submitAnalysis",
@@ -159,6 +170,51 @@ export const openApiDocument = {
     "/v1/runs/{runId}/evidence": {
       parameters: runParameters,
       get: operation("getRunEvidence", ref("EvidenceBundle")),
+    },
+    "/v1/runs/{runId}/export/csv": {
+      parameters: runParameters,
+      get: {
+        operationId: "exportRunCsv",
+        "x-implementation-status": "planned",
+        security: [{ bearerAuth: [] }],
+        responses: {
+          "200": {
+            description: "Safe CSV export with formula injection defense",
+            content: { "text/csv": { schema: Type.String() } },
+          },
+          "401": response(ref("Error"), "Authentication required"),
+          "403": response(ref("Error"), "Access denied"),
+          "404": response(ref("Error"), "Resource unavailable"),
+        },
+      },
+    },
+    "/v1/runs/{runId}/export/sql": {
+      parameters: runParameters,
+      get: {
+        operationId: "exportRunSql",
+        "x-implementation-status": "planned",
+        security: [{ bearerAuth: [] }],
+        responses: {
+          "200": {
+            description: "Inspectable analytical SQL with dialect headers",
+            content: { "application/sql": { schema: Type.String() } },
+          },
+          "401": response(ref("Error"), "Authentication required"),
+          "403": response(ref("Error"), "Access denied"),
+          "404": response(ref("Error"), "Resource unavailable"),
+        },
+      },
+    },
+    "/v1/runs/{runId}/export/reproducibility": {
+      parameters: runParameters,
+      get: operation(
+        "exportReproducibilityBundle",
+        ref("ReproducibilityBundle"),
+      ),
+    },
+    "/v1/runs/{runId}/ledger": {
+      parameters: runParameters,
+      get: operation("getTruthLedger", ref("TruthLedger")),
     },
     "/v1/feedback": {
       post: operation(

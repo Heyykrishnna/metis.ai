@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
 import type { FastifyPluginAsyncTypebox } from "@fastify/type-provider-typebox";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import Type, { type Static } from "typebox";
-import { ErrorSchema } from "../contracts/common.js";
+import { ErrorSchema, IdSchema } from "../contracts/common.js";
 import {
   ConnectionInputSchema,
   ConnectionSchema,
@@ -223,6 +223,163 @@ export const connectionRoutes: FastifyPluginAsyncTypebox = async (app) => {
       }
 
       return list;
+    },
+  );
+
+  app.get(
+    "/v1/connections/:connectionId",
+    {
+      schema: {
+        params: Type.Object(
+          {
+            connectionId: IdSchema,
+          },
+          { additionalProperties: false },
+        ),
+        response: {
+          200: ConnectionSchema,
+          404: ErrorSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const { connectionId } = request.params as { connectionId: string };
+      const workspaceId =
+        request.authContext?.workspaceId ??
+        "00000000-0000-4000-8000-000000000001";
+      const requestId = request.id ?? "req-unknown";
+
+      if (app.metadataDb) {
+        try {
+          const rows = await app.metadataDb
+            .select()
+            .from(connections)
+            .where(
+              and(
+                eq(connections.id, connectionId),
+                eq(connections.workspaceId, workspaceId),
+              ),
+            );
+          const r = rows[0];
+          if (r) {
+            return reply.send({
+              id: r.id,
+              name: r.name,
+              engine: "PostgreSQL" as const,
+              allowedSchemas: r.allowedSchemas,
+              status: r.status,
+            });
+          }
+        } catch {
+          // Fallback to memory
+        }
+      }
+
+      const memConn = memoryConnections.get(connectionId);
+      if (memConn && memConn.workspaceId === workspaceId) {
+        return reply.send({
+          id: memConn.id,
+          name: memConn.name,
+          engine: memConn.engine,
+          allowedSchemas: memConn.allowedSchemas,
+          status: memConn.status,
+        });
+      }
+
+      return reply.status(404).send({
+        code: "not_found",
+        message: "Resource unavailable",
+        requestId,
+      });
+    },
+  );
+
+  app.delete(
+    "/v1/connections/:connectionId",
+    {
+      schema: {
+        params: Type.Object(
+          {
+            connectionId: IdSchema,
+          },
+          { additionalProperties: false },
+        ),
+        response: {
+          200: ConnectionSchema,
+          404: ErrorSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const { connectionId } = request.params as { connectionId: string };
+      const workspaceId =
+        request.authContext?.workspaceId ??
+        "00000000-0000-4000-8000-000000000001";
+      const requestId = request.id ?? "req-unknown";
+
+      const existingMem = memoryConnections.get(connectionId);
+      if (existingMem && existingMem.workspaceId !== workspaceId) {
+        return reply.status(404).send({
+          code: "not_found",
+          message: "Resource unavailable",
+          requestId,
+        });
+      }
+
+      if (app.metadataDb) {
+        try {
+          const rows = await app.metadataDb
+            .select()
+            .from(connections)
+            .where(
+              and(
+                eq(connections.id, connectionId),
+                eq(connections.workspaceId, workspaceId),
+              ),
+            );
+          const r = rows[0];
+          if (r) {
+            await app.metadataDb
+              .update(connections)
+              .set({ status: "revoked" })
+              .where(
+                and(
+                  eq(connections.id, connectionId),
+                  eq(connections.workspaceId, workspaceId),
+                ),
+              );
+            if (existingMem) {
+              existingMem.status = "revoked";
+            }
+            return reply.send({
+              id: r.id,
+              name: r.name,
+              engine: "PostgreSQL" as const,
+              allowedSchemas: r.allowedSchemas,
+              status: "revoked",
+            });
+          }
+        } catch {
+          // Fallback to memory
+        }
+      }
+
+      if (existingMem && existingMem.workspaceId === workspaceId) {
+        existingMem.status = "revoked";
+        return reply.send({
+          id: existingMem.id,
+          name: existingMem.name,
+          engine: existingMem.engine,
+          allowedSchemas: existingMem.allowedSchemas,
+          status: "revoked",
+        });
+      }
+
+      return reply.status(404).send({
+        code: "not_found",
+        message: "Resource unavailable",
+        requestId,
+      });
     },
   );
 };
