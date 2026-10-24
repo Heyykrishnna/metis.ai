@@ -1,0 +1,182 @@
+import Type, { type TSchema } from "typebox";
+import {
+  AnswerEnvelopeSchema,
+  AnalyticalPlanSchema,
+  EvidenceBundleSchema,
+  ExecutionRecordSchema,
+  QuestionIntentSchema,
+  ResultSchema,
+  RunEventSchema,
+  RunSchema,
+  SchemaEvidenceSchema,
+  SqlCandidateSchema,
+  SubmitAnalysisSchema,
+  VerificationReportSchema,
+} from "./analysis.js";
+import { ErrorSchema, HealthSchema, IdSchema } from "./common.js";
+import {
+  ConnectionInputSchema,
+  ConnectionSchema,
+  ConnectionTestSchema,
+  FeedbackSchema,
+} from "./connections.js";
+
+const apiSchemas = {
+  QuestionIntent: QuestionIntentSchema,
+  SchemaEvidence: SchemaEvidenceSchema,
+  AnalyticalPlan: AnalyticalPlanSchema,
+  SqlCandidate: SqlCandidateSchema,
+  ExecutionRecord: ExecutionRecordSchema,
+  VerificationReport: VerificationReportSchema,
+  AnswerEnvelope: AnswerEnvelopeSchema,
+  RunEvent: RunEventSchema,
+  Health: HealthSchema,
+  Error: ErrorSchema,
+  Run: RunSchema,
+  Result: ResultSchema,
+  EvidenceBundle: EvidenceBundleSchema,
+  ConnectionInput: ConnectionInputSchema,
+  Connection: ConnectionSchema,
+  Connections: Type.Array(ConnectionSchema, { maxItems: 100 }),
+  ConnectionTest: ConnectionTestSchema,
+  Feedback: FeedbackSchema,
+  SubmitAnalysis: SubmitAnalysisSchema,
+  FeedbackReceipt: Type.Object(
+    { id: IdSchema },
+    { additionalProperties: false },
+  ),
+};
+function ref(name: keyof typeof apiSchemas) {
+  return Type.Ref(`#/components/schemas/${name}`);
+}
+
+function response(schema: TSchema, description: string) {
+  return { description, content: { "application/json": { schema } } };
+}
+
+function operation(
+  operationId: string,
+  schema: TSchema,
+  body?: TSchema,
+  status = "200",
+) {
+  return {
+    operationId,
+    "x-implementation-status": "planned",
+    security: [{ bearerAuth: [] }],
+    ...(body === undefined
+      ? {}
+      : {
+          requestBody: {
+            required: true,
+            content: { "application/json": { schema: body } },
+          },
+        }),
+    responses: {
+      [status]: response(schema, "Successful response"),
+      "400": response(ref("Error"), "Invalid request"),
+      "401": response(ref("Error"), "Authentication required"),
+      "403": response(ref("Error"), "Access denied"),
+      "404": response(ref("Error"), "Resource unavailable"),
+      "429": response(ref("Error"), "Resource limit reached"),
+      "503": response(ref("Error"), "Dependency unavailable"),
+    },
+  };
+}
+const runParameters = [
+  { name: "runId", in: "path", required: true, schema: IdSchema },
+];
+
+export const openApiDocument = {
+  openapi: "3.1.0",
+  info: {
+    title: "metis.ai API",
+    version: "0.1.0",
+    description:
+      "Phase 0 contracts. Only /health is implemented. Operations labelled planned are specifications, not available product routes.",
+  },
+  paths: {
+    "/health": {
+      get: {
+        operationId: "getHealth",
+        security: [],
+        "x-implementation-status": "implemented",
+        responses: { "200": response(ref("Health"), "Process is alive") },
+      },
+    },
+    "/v1/connections/test": {
+      post: operation(
+        "testConnection",
+        ref("ConnectionTest"),
+        ref("ConnectionInput"),
+      ),
+    },
+    "/v1/connections": {
+      post: operation(
+        "createConnection",
+        ref("Connection"),
+        ref("ConnectionInput"),
+        "201",
+      ),
+      get: operation("listConnections", ref("Connections")),
+    },
+    "/v1/analyses": {
+      post: operation(
+        "submitAnalysis",
+        ref("Run"),
+        ref("SubmitAnalysis"),
+        "202",
+      ),
+    },
+    "/v1/runs/{runId}": {
+      parameters: runParameters,
+      get: operation("getRun", ref("Run")),
+    },
+    "/v1/runs/{runId}/events": {
+      parameters: runParameters,
+      get: {
+        ...operation("getRunEvents", ref("RunEvent")),
+        responses: {
+          "200": {
+            description:
+              "Ordered SSE progress; each data frame conforms to RunEvent",
+            content: { "text/event-stream": { schema: Type.String() } },
+          },
+          "401": response(ref("Error"), "Authentication required"),
+          "403": response(ref("Error"), "Access denied"),
+          "404": response(ref("Error"), "Resource unavailable"),
+        },
+      },
+    },
+    "/v1/runs/{runId}/cancel": {
+      parameters: runParameters,
+      post: operation("cancelRun", ref("Run"), undefined, "202"),
+    },
+    "/v1/runs/{runId}/result": {
+      parameters: runParameters,
+      get: operation("getRunResult", ref("Result")),
+    },
+    "/v1/runs/{runId}/evidence": {
+      parameters: runParameters,
+      get: operation("getRunEvidence", ref("EvidenceBundle")),
+    },
+    "/v1/feedback": {
+      post: operation(
+        "submitFeedback",
+        ref("FeedbackReceipt"),
+        ref("Feedback"),
+        "201",
+      ),
+    },
+    "/health/live": {
+      get: { ...operation("getLiveness", ref("Health")), security: [] },
+    },
+    "/health/ready": {
+      get: { ...operation("getReadiness", ref("Health")), security: [] },
+    },
+  },
+  components: {
+    securitySchemes: { bearerAuth: { type: "http", scheme: "bearer" } },
+    schemas: apiSchemas,
+  },
+};

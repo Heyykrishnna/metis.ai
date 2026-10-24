@@ -14,8 +14,6 @@ metis.ai turns a natural-language question into a validated analytical result. I
 - Keep the database safe with least-privilege access and independent query policy.
 - Know when the system cannot answer reliably, and what is missing.
 
-
-
 ## How an answer is shown
 
 Every completed analysis is an inspectable record, not a chat reply:
@@ -40,7 +38,6 @@ If a definition is ambiguous, metis.ai asks one focused question instead of gues
 
 ## Stack
 
-
 | Layer                | Choice                                  |
 | -------------------- | --------------------------------------- |
 | Frontend             | Next.js, React, TypeScript              |
@@ -51,36 +48,46 @@ If a definition is ambiguous, metis.ai asks one focused question instead of gues
 | Logging              | Pino                                    |
 | Tests                | Vitest                                  |
 
-
 Inference runs as a separate service using a compliant open-weight model of at most 8B parameters. A job queue is not part of the core path; add one only when a long-running workflow needs durable workers.
 
 ## Getting started
 
-Requires Node.js 24 or later.
+Requires Node.js 24 or later and npm. Install reproducibly from the repository root:
 
 ```bash
-# API
-cd backend
-cp .env.example .env
-npm install
-npm run dev
+npm --prefix backend ci
+npm --prefix frontend ci
+node scripts/skills.mjs --link
 ```
+
+Use [the foundation setup guide](docs/engineering/foundation.md) to generate local environment files, start isolated databases, apply migrations, and initialize synthetic fixtures. Preserve any existing environment files.
+
+Run the applications in separate terminals:
 
 ```bash
-# Web app
-cd frontend
-npm install
-npm run dev
+npm --prefix backend run dev
+npm --prefix frontend run dev
 ```
 
-The API listens on `http://127.0.0.1:3001`. The web app listens on `http://localhost:3000`.
-
-```bash
-cd backend && npm run test:run
-```
-
-
+The API listens on `http://127.0.0.1:3001`; the web app listens on `http://localhost:3000`.
 
 ## Status
 
 This repository is the foundation for metis.ai. The product is specified; the first delivery target is a single reliable vertical slice: connect a database, inspect schema, ask a question, execute safe SQL, and return an evidence-backed answer or a clear refusal.
+
+## Foundation workflow
+
+Phase 0 adds reproducible checks, contract generation, versioned metadata migrations, synthetic PostgreSQL fixtures, and a pinned local inference configuration. Product analysis endpoints remain planned.
+
+Follow [the foundation guide](docs/engineering/foundation.md) for environment generation, isolated databases, skill synchronization, contracts, checks, and recovery. See [validation evidence](docs/engineering/foundation-validation.md) for actual outcomes and limits, and [local inference configuration](inference/README.md) for the model boundary.
+
+```bash
+npm --prefix backend run check
+npm --prefix frontend run check
+node scripts/skills.mjs --link
+node scripts/check-foundation.mjs
+node scripts/test-database.mjs
+node scripts/smoke.mjs
+```
+
+The local delivery plan remains in the Git-ignored `project-phases/` folder. Canonical skills under `.agents/skills` are tracked; `skills/` contains ignored aliases. Do not use fixture administrator credentials for analytical queries.

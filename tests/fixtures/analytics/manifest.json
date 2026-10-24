@@ -1,0 +1,9 @@
+{
+  "version": "1.0.0",
+  "purpose": "Frozen synthetic foundation cases; held-out expected results are evaluation-only, never agent context.",
+  "files": {
+    "cases.json": "c3b04ba73abfa500d453dee7b10049df7f12402467520a0d49945d43a626ec57",
+    "declines.sql": "a26c24b46a5a9d22a12fe7cc9164a2e3107915bf4a877b1de604caaa8b6c3cfc",
+    "seed.sql": "52eec06a1996063b09f1ca3659610d4c9017e62583aed93fb2786f33cd16e623"
+  }
+}

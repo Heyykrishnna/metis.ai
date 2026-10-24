@@ -1,0 +1,26 @@
+export const foundationPolicy = {
+  version: "1.0.0",
+  engine: "PostgreSQL",
+  limits: {
+    schemaTimeoutMs: 5000,
+    modelTimeoutMs: 20000,
+    queryTimeoutMs: 5000,
+    totalRunTimeoutMs: 45000,
+    resultRows: 1000,
+    resultBytes: 1048576,
+    sampleRowsPerTable: 100,
+    profileTablesPerRun: 10,
+    modelCallsPerRun: 6,
+    sqlRepairs: 2,
+    runsPerWorkspace: 2,
+    modelConcurrency: 1,
+    databasePoolSize: 5,
+  },
+  retention: {
+    questionDays: 30,
+    schemaSnapshotDays: 7,
+    auditDays: 90,
+    resultMinutes: 15,
+    storeRawResultsByDefault: false,
+  },
+} as const;

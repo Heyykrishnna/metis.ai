@@ -1,7 +1,6 @@
-import {
-  Type,
-  type FastifyPluginAsyncTypebox,
-} from "@fastify/type-provider-typebox";
+import type { FastifyPluginAsyncTypebox } from "@fastify/type-provider-typebox";
+
+import { HealthSchema } from "../contracts/common.js";
 
 export const healthRoutes: FastifyPluginAsyncTypebox = async (app) => {
   app.get(
@@ -9,9 +8,7 @@ export const healthRoutes: FastifyPluginAsyncTypebox = async (app) => {
     {
       schema: {
         response: {
-          200: Type.Object({
-            status: Type.Literal("ok"),
-          }),
+          200: HealthSchema,
         },
       },
     },
