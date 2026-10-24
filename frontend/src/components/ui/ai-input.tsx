@@ -5,7 +5,7 @@ import { PromptEditor } from "./prompt-editor";
 import { Icon, type IconName } from "../icon";
 
 const modes: { label: string; icon: IconName }[] = [
-  { label: "Ask your data", icon: "sparkles" },
+  { label: "Ask your data", icon: "chat" },
   { label: "Explore schema", icon: "table" },
   { label: "Verify a claim", icon: "shield" },
 ];
@@ -15,6 +15,7 @@ export function AIInput({
   onChange,
   onSubmit,
   onAttach,
+  onSelectSource,
   source,
   mode,
   onModeChange,
@@ -24,6 +25,7 @@ export function AIInput({
   onChange: (value: string) => void;
   onSubmit: () => void;
   onAttach: () => void;
+  onSelectSource: () => void;
   source: string;
   mode: string;
   onModeChange: (mode: string) => void;
@@ -84,7 +86,7 @@ export function AIInput({
             <button
               type="button"
               className="source-selector"
-              onClick={onAttach}
+              onClick={onSelectSource}
             >
               <Icon name="database" size={15} />
               <span>{source}</span>
@@ -120,7 +122,7 @@ export function AIInput({
         </span>
         <span>
           {sourceCount
-            ? `${sourceCount} stored ${sourceCount === 1 ? "file" : "files"} available`
+            ? `${sourceCount} ${sourceCount === 1 ? "source" : "sources"} available`
             : "Your data stays yours"}
         </span>
       </div>

@@ -77,7 +77,7 @@ export const templates = [
     description: "Discover useful questions for an unfamiliar dataset.",
     question:
       "What useful questions can I answer with this data? Explain which columns each question needs.",
-    icon: "sparkles",
+    icon: "chat",
     color: "lavender",
     category: "Explore",
   },

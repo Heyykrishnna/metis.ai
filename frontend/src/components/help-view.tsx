@@ -46,7 +46,7 @@ export function HelpView({
       </section>
       <section className="panel help-aside">
         <span className="tile-icon lavender">
-          <Icon name="sparkles" size={25} />
+          <Icon name="chat" size={25} />
         </span>
         <h3>
           Small shortcuts.

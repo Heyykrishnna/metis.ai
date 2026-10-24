@@ -17,6 +17,7 @@ type HomeProps = {
   mode: string;
   setMode: (value: string) => void;
   source: string;
+  sourceCount: number;
   submitQuestion: () => void;
   navigate: (view: View) => void;
   applyTemplate: (text: string, category: string) => void;
@@ -37,6 +38,7 @@ export function HomeView({
   mode,
   setMode,
   source,
+  sourceCount,
   submitQuestion,
   navigate,
   applyTemplate,
@@ -71,11 +73,9 @@ export function HomeView({
           className="source-status"
           onClick={() => navigate("Data sources")}
         >
-          <span
-            className={`status-dot ${documents.length ? "connected" : ""}`}
-          />
-          {documents.length
-            ? `${documents.length} stored ${documents.length === 1 ? "source" : "sources"}`
+          <span className={`status-dot ${sourceCount ? "connected" : ""}`} />
+          {sourceCount
+            ? `${sourceCount} ${sourceCount === 1 ? "source" : "sources"} connected`
             : "Ready for your first source"}
           <Icon name="down" size={12} />
         </button>
@@ -92,10 +92,11 @@ export function HomeView({
             onChange={setPrompt}
             onSubmit={submitQuestion}
             onAttach={onUpload}
+            onSelectSource={() => navigate("Data sources")}
             source={source}
             mode={mode}
             onModeChange={setMode}
-            sourceCount={documents.length}
+            sourceCount={sourceCount}
           />
           <div className="suggestion-grid">
             {templates.slice(0, 3).map((template) => (

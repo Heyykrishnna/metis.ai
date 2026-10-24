@@ -1,0 +1,157 @@
+.thinking-panel {
+  margin: 20px 0;
+  border: 1px solid #e2e1ed;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 4px 20px #483d6505;
+  color: #626371;
+  font-size: 12px;
+}
+
+.thinking-trigger {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 56px;
+  gap: 12px;
+  padding: 14px 18px;
+  border: 0;
+  border-radius: 14px;
+  background: #f8f7fc;
+  text-align: left;
+  font-weight: 500;
+  color: #544c6c;
+}
+
+.thinking-trigger:hover {
+  background: #f1eff8;
+}
+
+.thinking-trigger > svg {
+  transition: transform 220ms ease;
+}
+
+.thinking-trigger[aria-expanded="true"] > svg {
+  transform: rotate(180deg);
+}
+
+.thinking-indicator {
+  margin-left: auto;
+  padding-left: 12px;
+  font-size: 10px;
+  font-weight: 400;
+  color: #716a84;
+  white-space: nowrap;
+}
+
+.thinking-pixels {
+  flex-shrink: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 3px);
+  gap: 2px;
+  color: #9282b5;
+}
+
+.thinking-pixels > span {
+  height: 3px;
+  border-radius: 1px;
+  background: currentColor;
+}
+
+.thinking-content {
+  overflow: hidden;
+}
+
+.thinking-content-inner {
+  overflow: hidden;
+  min-height: 0;
+}
+
+.thinking-steps {
+  list-style: none;
+  margin: 0;
+  padding: 20px 18px;
+  border-top: 1px solid #eceaf2;
+}
+
+.thinking-steps > li {
+  position: relative;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+  padding-bottom: 22px;
+}
+
+.thinking-steps > li:last-child {
+  padding-bottom: 0;
+}
+
+.thinking-steps > li:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  left: 8px;
+  top: 22px;
+  bottom: 5px;
+  width: 1px;
+  background: #e7e3ef;
+}
+
+.thinking-step-icon {
+  display: grid;
+  place-items: center;
+  height: 20px;
+  color: #8b7aa9;
+}
+
+.thinking-steps strong {
+  font-weight: 500;
+  color: #524e60;
+}
+
+.thinking-description {
+  margin-top: 5px;
+  color: #75717e;
+  font-size: 11px;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+
+.thinking-source {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 100%;
+  margin-top: 8px;
+  padding: 5px 9px;
+  border: 1px solid #e9e6ef;
+  border-radius: 7px;
+  background: #faf9fc;
+  color: #686075;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.thinking-result {
+  margin-top: 8px;
+  color: var(--accent);
+  font-size: 11px;
+}
+
+@media (max-width: 600px) {
+  .thinking-indicator {
+    display: none;
+  }
+  .thinking-trigger > svg {
+    margin-left: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .thinking-pixels > span,
+  .thinking-content,
+  .thinking-trigger > svg {
+    animation: none !important;
+    transition: none;
+  }
+}

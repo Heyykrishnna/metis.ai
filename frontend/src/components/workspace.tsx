@@ -54,6 +54,9 @@ import { FileAnswer, FileEvidence, FileSchema } from "./file-answer";
 import { CodeBlock } from "./ui/code-block";
 import { FileDropzone } from "./ui/file-dropzone";
 import { FormattedMarkdown } from "./ui/formatted-markdown";
+import { ThinkingPanel } from "./ui/thinking-panel";
+import { Orb } from "./ui/orb";
+import { analysisActivity } from "@/lib/analysis-activity";
 import { useQuestions } from "./use-questions";
 import {
   DocumentPreview,
@@ -98,6 +101,7 @@ export function Workspace() {
   const [question, setQuestion] = useState<Question | null>(null);
   const [questionTab, setQuestionTab] = useState("Overview");
   const [reading, setReading] = useState(false);
+  const [syncing, setSyncing] = useState(true);
   const [fileErrors, setFileErrors] = useState<string[]>([]);
   const [notice, setNotice] = useState("");
   const [filter, setFilter] = useState("");
@@ -159,7 +163,7 @@ export function Workspace() {
             body.inferenceAvailable === true,
         );
         if (online) {
-          Promise.all([loadFiles(), fileHistory()])
+          const storedFiles = Promise.all([loadFiles(), fileHistory()])
             .then(([files, history]) => {
               if (controller.signal.aborted) return;
               setDocuments(files);
@@ -208,7 +212,7 @@ export function Workspace() {
                     : "Stored files could not be loaded.",
                 );
             });
-          getConnections()
+          const connectionList = getConnections()
             .then((list) => {
               setConnections(list);
               if (list.length > 0) {
@@ -219,13 +223,17 @@ export function Workspace() {
             })
             .catch(() => void 0);
 
-          getRecipes()
+          const recipeList = getRecipes()
             .then(setRecipes)
             .catch(() => void 0);
+          await Promise.allSettled([storedFiles, connectionList, recipeList]);
         }
       })
       .catch(() => {
         if (!controller.signal.aborted) setApiStatus("offline");
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setSyncing(false);
       });
     return () => controller.abort();
   }, [statusVersion, updateQuestions]);
@@ -260,6 +268,7 @@ export function Workspace() {
     setSidebarOpen(false);
     setQuestion(null);
     setFilter("");
+    window.scrollTo({ top: 0, behavior: "instant" });
   }
 
   function applyTemplate(text: string, category: string) {
@@ -762,6 +771,7 @@ export function Workspace() {
         />
       )}
       <aside
+        id="workspace-navigation"
         className={`sidebar ${sidebarOpen ? "is-open" : ""}`}
         aria-label="Workspace navigation"
       >
@@ -861,6 +871,7 @@ export function Workspace() {
               className="icon-button mobile-menu"
               aria-label="Open navigation"
               aria-expanded={sidebarOpen}
+              aria-controls="workspace-navigation"
               onClick={() => setSidebarOpen(true)}
             >
               <Icon name="menu" />
@@ -870,6 +881,16 @@ export function Workspace() {
             <span>{view === "Home" ? "Home" : view}</span>
           </div>
           <div className="topbar-actions">
+            {(syncing || reading) && (
+              <span
+                className="sync-status"
+                role="status"
+                aria-label={reading ? "Saving files" : "Syncing workspace"}
+              >
+                <Orb size={20} />
+                <span>{reading ? "Saving files" : "Syncing workspace"}</span>
+              </span>
+            )}
             <span className="private-badge">
               <Icon name="shield" size={13} /> Private workspace
             </span>
@@ -908,6 +929,7 @@ export function Workspace() {
               mode={mode}
               setMode={setMode}
               source={source}
+              sourceCount={documents.length + connections.length}
               submitQuestion={submitQuestion}
               navigate={navigate}
               applyTemplate={applyTemplate}
@@ -1013,6 +1035,7 @@ export function Workspace() {
 
                     {questionTab === "Overview" && (
                       <div>
+                        <ThinkingPanel key={question.id} question={question} />
                         {question.status === "needs_clarification" && (
                           <ClarificationPanel
                             question={question}
@@ -1053,21 +1076,18 @@ export function Workspace() {
                               }
                             />
                           </div>
-                        ) : (
+                        ) : analysisActivity(question)?.state ===
+                          "thinking" ? null : (
                           <EmptyState
-                            icon="sparkles"
+                            icon="chat"
                             title={
-                              question.status === "planning" ||
-                              question.status === "executing"
-                                ? "Analysis in progress…"
+                              question.status
+                                ? "No result available"
                                 : "Draft analysis question"
                             }
                           >
-                            {question.status === "planning" ||
-                            question.status === "executing"
-                              ? question.fileId
-                                ? "Metis is reading the stored file and planning a validated calculation. Values are computed from the complete file."
-                                : "Metis is inspecting the schema, planning a read-only query, and gathering evidence."
+                            {question.status
+                              ? "Review the activity above, then refine or resubmit your question."
                               : "This question has not executed against an active database connection. Select an active connection and submit to generate verified results."}
                           </EmptyState>
                         )}
@@ -1387,30 +1407,6 @@ export function Workspace() {
               {view === "Templates" && <TemplatesView onUse={applyTemplate} />}
               {view === "Data sources" && (
                 <>
-                  <div className="connection-card">
-                    <span className="connection-logo">
-                      <Icon name="database" size={27} />
-                    </span>
-                    <div>
-                      <h3>
-                        {activeConnection
-                          ? `Connected to ${activeConnection.name}`
-                          : "Connect the bigger picture."}
-                      </h3>
-                      <p>
-                        {activeConnection
-                          ? `PostgreSQL read-only source with ${activeConnection.allowedSchemas.length} authorized schema(s).`
-                          : "Configure a read-only PostgreSQL data source or explore local files."}
-                      </p>
-                    </div>
-                    <button
-                      className="button"
-                      onClick={() => setModal("connection")}
-                    >
-                      <Icon name="link" size={16} />
-                      Database connections ({connections.length})
-                    </button>
-                  </div>
                   <section className="panel">
                     <div className="section-heading">
                       <h2>
@@ -1427,7 +1423,16 @@ export function Workspace() {
                         />
                       </label>
                     </div>
-                    {documents.length ? (
+                    {syncing && !documents.length ? (
+                      <div className="source-loading" role="status">
+                        <Orb />
+                        <strong>Finding your files</strong>
+                        <p>
+                          Syncing sources and saved analyses with your
+                          workspace.
+                        </p>
+                      </div>
+                    ) : documents.length ? (
                       <>
                         {filteredDocuments.length ? (
                           <FileList
@@ -1493,6 +1498,7 @@ export function Workspace() {
                   }}
                   onCheck={() => {
                     setApiStatus("checking");
+                    setSyncing(true);
                     setStatusVersion((value) => value + 1);
                   }}
                   onClear={() => {

@@ -1,0 +1,46 @@
+.orb {
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
+.orb > canvas {
+  display: block;
+  max-width: 100%;
+}
+
+.orb-placeholder {
+  width: 60%;
+  height: 60%;
+  border: 1px dotted #8ca194;
+  border-radius: 50%;
+}
+
+.sync-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 10px;
+  color: #64786b;
+}
+
+.source-loading {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.source-loading strong {
+  color: var(--foreground);
+  font-weight: 500;
+}
+
+@media (max-width: 760px) {
+  .sync-status > span:last-child {
+    display: none;
+  }
+}
