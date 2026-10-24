@@ -4,19 +4,19 @@ This document owns the implemented foundation decisions and operating instructio
 
 ## Architecture and decisions
 
-| Decision                  | Phase 0 choice                                                    | Rationale and constraint                                                                                                                 |
-| ------------------------- | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| Runtime                   | Node.js 24, separate npm applications and lockfiles               | Preserve the established layout and backend TypeScript 7; frontend Node types now match the runtime                                      |
-| Initial analytical engine | PostgreSQL; SELECT and approved read-only CTEs planned            | Existing driver/parser support; additional dialects require independent security/integration validation                                  |
-| Metadata                  | Drizzle schema and versioned `backend/drizzle` migrations         | Keep configured migration path; 13 tables represent the PRD domain with composite workspace references                                   |
-| Identity boundary         | External authenticated subject, workspace membership and owner    | A subject is supplied only by future validated server auth; never trust a client-supplied workspace as authorization                     |
-| Connection secrets        | `secret://` references only in metadata                           | The future local secret store must encrypt credentials with an externally supplied key; credentials never enter inference/frontend/logs  |
-| Network boundary          | Local-only development PostgreSQL and inference                   | Future connector policy must validate approved hosts/resolved addresses and restrict egress; no arbitrary remote inference is authorized |
-| API contracts             | Backend TypeBox -> OpenAPI 3.1 -> frontend generated declarations | Runtime shapes and client types share one source; CI fails on stale generated artifacts                                                  |
-| Lifecycle                 | Seven terminal outcomes with explicit allowed transitions         | A late result cannot reopen cancelled/completed work; clarification starts a linked child run                                            |
-| Limits/retention          | `backend/src/policy.ts`, version 1.0.0                            | Initial conservative configuration; enforcement and workload tuning are subsequent phases                                                |
-| Skills                    | Canonical tracked `.agents/skills`; ignored `skills/` symlinks    | One implementation per skill, hash-pinned source snapshot, no independently edited mirrors                                               |
-| Inference                 | Pinned local Qwen2.5-Coder configuration                          | Model setup only, per the user's instruction; no weight download, inference execution, quality or hardware readiness claim               |
+| Decision                  | Phase 0 choice                                                                | Rationale and constraint                                                                                                                                                                                 |
+| ------------------------- | ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Runtime                   | Node.js 24, separate npm applications and lockfiles                           | Preserve the established layout and backend TypeScript 7; frontend Node types now match the runtime                                                                                                      |
+| Initial analytical engine | PostgreSQL; SELECT and approved read-only CTEs planned                        | Existing driver/parser support; additional dialects require independent security/integration validation                                                                                                  |
+| Metadata                  | Drizzle schema and versioned `backend/drizzle` migrations                     | Keep configured migration path; 13 tables represent the PRD domain with composite workspace references                                                                                                   |
+| Identity boundary         | External authenticated subject, workspace membership and owner                | A subject is supplied only by future validated server auth; never trust a client-supplied workspace as authorization                                                                                     |
+| Connection secrets        | `secret://` references only in metadata                                       | The future local secret store must encrypt credentials with an externally supplied key; credentials never enter inference/frontend/logs                                                                  |
+| Network boundary          | Neon metadata over verified TLS; local-only synthetic analytics and inference | Workspace/run/evidence/connection metadata may reside in Neon; source query results are not persisted by default. Future connector policy must restrict approved hosts and egress; inference stays local |
+| API contracts             | Backend TypeBox -> OpenAPI 3.1 -> frontend generated declarations             | Runtime shapes and client types share one source; CI fails on stale generated artifacts                                                                                                                  |
+| Lifecycle                 | Seven terminal outcomes with explicit allowed transitions                     | A late result cannot reopen cancelled/completed work; clarification starts a linked child run                                                                                                            |
+| Limits/retention          | `backend/src/policy.ts`, version 1.0.0                                        | Initial conservative configuration; enforcement and workload tuning are subsequent phases                                                                                                                |
+| Skills                    | Canonical tracked `.agents/skills`; ignored `skills/` symlinks                | One implementation per skill, hash-pinned source snapshot, no independently edited mirrors                                                                                                               |
+| Inference                 | Pinned local Qwen2.5-Coder configuration                                      | Model setup only, per the user's instruction; no weight download, inference execution, quality or hardware readiness claim                                                                               |
 
 The metadata schema prevents mismatched workspace references. It does not provide an authentication implementation or a blanket tenant-isolation guarantee. Queries must still be scoped and authorized in the application; database RLS/least-privilege application roles require separate validation before production.
 
@@ -29,14 +29,18 @@ npm --prefix backend ci
 npm --prefix frontend ci
 node scripts/skills.mjs --link
 node scripts/local-env.mjs
-docker compose up -d --wait
+docker compose up -d --wait analytics
 npm --prefix backend run db:migrate
 npm --prefix backend run fixtures:reset
 ```
 
+Before setup, supply `DATABASE_URL` through your shell or secret manager using the Neon pooled URL. `DATABASE_URL_UNPOOLED` may supply the direct migration URL; setup derives the direct Neon hostname when omitted. Never put either credential-bearing URL in tracked documentation or frontend environment variables.
+
 `local-env.mjs` creates `.env` and `backend/.env` with fresh random development passwords and restrictive file permissions. It refuses to overwrite either existing file and never prints credentials. For an existing environment, configure missing variable names manually from `.env.example`; preserve existing values. Generated environment files are ignored.
 
-Compose binds metadata to `127.0.0.1:55432` and synthetic analytics to `127.0.0.1:55433`. The databases have separate instances, volumes and administrator credentials. Use the database-scoped restricted reader username printed by fixture setup for analysis, never the fixture administrator. Setup preserves existing reader credentials and refuses unrelated roles; integration tests use unique names and remove only roles they created. Fixture reset changes only the dedicated `metis_*_fixture`/`metis_*_test` databases and recreates synthetic schemas; never point it at real user data. Run the reset command from a checkout whose fixtures are verified.
+Neon is the configured application metadata database. The optional `local-metadata` Compose profile is only for disposable/offline development (`node scripts/local-env.mjs --local-metadata` in a fresh checkout, then `docker compose --profile local-metadata up -d --wait`). It does not replace existing Neon configuration.
+
+Compose can bind optional metadata to `127.0.0.1:55432` and synthetic analytics to `127.0.0.1:55433`. The databases have separate instances, volumes and administrator credentials. Use the database-scoped restricted reader username printed by fixture setup for analysis, never the fixture administrator. Setup preserves existing reader credentials and refuses unrelated roles; integration tests use unique names and remove only roles they created. Fixture reset changes only the dedicated `metis_*_fixture`/`metis_*_test` databases and recreates synthetic schemas; never point it at real user data. Run the reset command from a checkout whose fixtures are verified.
 
 Run the API and web app in separate terminals:
 
@@ -49,7 +53,7 @@ API: `http://127.0.0.1:3001/health`. Web app: `http://localhost:3000`. Missing i
 
 ## Configuration and privacy
 
-Backend variables: `NODE_ENV` (`development`, `test`, `production`), `HOST`, `PORT` (1-65535), `LOG_LEVEL` (Pino levels), and `DATABASE_URL` (PostgreSQL URI). Validation errors identify the variable without printing its value. Empty/invalid values are rejected. Local fixture tooling additionally reads `FIXTURE_DATABASE_URL` and the generated `FIXTURE_READER_PASSWORD` from root `.env`.
+Backend variables: `DATABASE_URL_UNPOOLED` (direct migration connection), `NODE_ENV` (`development`, `test`, `production`), `HOST`, `PORT` (1-65535), `LOG_LEVEL` (Pino levels), and `DATABASE_URL` (Neon pooled PostgreSQL URI at runtime). Validation errors identify the variable without printing its value. Empty/invalid values are rejected. Local fixture tooling additionally reads `FIXTURE_DATABASE_URL` and the generated `FIXTURE_READER_PASSWORD` from root `.env`.
 
 Pino redacts common credentials, authorization/cookie headers and request bodies. Error serialization retains only the error type, excluding stack/message content that may contain private data. Keep log messages static and payloads minimal; redaction is not permission to log arbitrary results or credentials under unrecognized keys.
 
@@ -94,3 +98,19 @@ Backend lint uses Oxlint because the installed TypeScript 7 compiler falls outsi
 The frontend uses system fonts so a clean production build does not require Google Fonts access. Turbopack's root is explicitly the frontend directory. If a restricted environment denies Turbopack worker ports, allow the build's local worker processes and clear only generated `.next` cache before retrying; do not disable checks.
 
 See [validation evidence](foundation-validation.md) for actual results and environmental limits. CI is configured in `.github/workflows/quality.yml`; a local passing run is not evidence that GitHub has executed it.
+
+## Neon metadata connection
+
+The user-provided Neon connection is stored only in ignored `backend/.env`. The API checks connectivity during startup, exposes the Drizzle metadata handle to routes, and closes its pool on shutdown. Pools are bounded to five connections with connection, idle, lifetime and statement limits.
+
+The metadata driver is node-postgres because it supports TLS channel binding; the existing Postgres.js driver remains for analytical fixtures. For Neon hosts, URL TLS parameters are normalized so they cannot override certificate verification; `rejectUnauthorized: true` and channel binding are enabled. The driver selects SCRAM-SHA-256-PLUS when the server offers it. See [driver SSL/channel-binding support](https://node-postgres.com/features/ssl) and [Neon security guidance](https://neon.com/docs/connect/connect-securely).
+
+`DATABASE_URL` is pooled for runtime; `DATABASE_URL_UNPOOLED` is direct for migrations, following [Neon's Drizzle guidance](https://neon.com/docs/guides/drizzle). `db:migrate` refuses pooled migration hosts. No source credentials or provider hostname is hardcoded.
+
+```bash
+npm --prefix backend run db:inspect
+npm --prefix backend run db:migrate
+npm --prefix backend run db:check
+```
+
+Inspection reads schema metadata only. Migration applies the reviewed versioned SQL. Verification checks 13 expected tables, column names/types, run-status enum and exact migration hashes. It preserves unrelated objects; it does not claim to detect every possible privilege, index or constraint drift. Synthetic fixture/reset/recovery tests remain restricted to dedicated disposable databases and never target the Neon metadata database.

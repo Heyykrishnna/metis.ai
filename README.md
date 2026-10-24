@@ -43,7 +43,7 @@ If a definition is ambiguous, metis.ai asks one focused question instead of gues
 | Frontend             | Next.js, React, TypeScript              |
 | API                  | Node.js LTS, TypeScript, Fastify        |
 | Validation           | TypeBox                                 |
-| Application metadata | PostgreSQL, Drizzle                     |
+| Application metadata | Neon PostgreSQL, Drizzle                |
 | Analytical SQL       | Connector adapters and a SQL AST parser |
 | Logging              | Pino                                    |
 | Tests                | Vitest                                  |
@@ -91,3 +91,5 @@ node scripts/smoke.mjs
 ```
 
 The local delivery plan remains in the Git-ignored `project-phases/` folder. Canonical skills under `.agents/skills` are tracked; `skills/` contains ignored aliases. Do not use fixture administrator credentials for analytical queries.
+
+Application metadata now uses Neon. Keep pooled `DATABASE_URL` and direct `DATABASE_URL_UNPOOLED` in ignored backend environment configuration; use `npm --prefix backend run db:check` to verify schema synchronization. See [Neon connection details](docs/engineering/foundation.md#neon-metadata-connection).
