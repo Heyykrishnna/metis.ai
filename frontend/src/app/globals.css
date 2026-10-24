@@ -569,6 +569,13 @@ kbd {
 .source-selector:hover {
   background: #f4f5f7;
 }
+.source-selector:disabled {
+  opacity: 1;
+  cursor: wait;
+  background: #f8faf6;
+  border-color: #dde7d9;
+  color: #667c6d;
+}
 .local-model {
   display: flex;
   align-items: center;
