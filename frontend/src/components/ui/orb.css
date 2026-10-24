@@ -17,7 +17,6 @@
   border-radius: 50%;
 }
 
-
 .source-loading {
   display: grid;
   justify-items: center;
@@ -31,4 +30,3 @@
   color: var(--foreground);
   font-weight: 500;
 }
-

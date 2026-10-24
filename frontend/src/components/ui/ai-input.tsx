@@ -99,7 +99,12 @@ export function AIInput({
               title={syncing ? "Syncing workspace" : source}
             >
               {syncing ? <Orb size={20} /> : <Icon name="database" size={15} />}
-              <span className="source-selector-label" role={syncing ? "status" : undefined}>{syncing ? "Syncing workspace…" : source}</span>
+              <span
+                className="source-selector-label"
+                role={syncing ? "status" : undefined}
+              >
+                {syncing ? "Syncing workspace…" : source}
+              </span>
               <Icon name="down" size={13} />
             </button>
           </div>

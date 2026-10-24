@@ -76,9 +76,11 @@ export function HomeView({
           onClick={() => navigate("Data sources")}
         >
           <span className={`status-dot ${sourceCount ? "connected" : ""}`} />
-          {syncing ? "Syncing sources…" : sourceCount
-            ? `${sourceCount} ${sourceCount === 1 ? "source" : "sources"} connected`
-            : "Ready for your first source"}
+          {syncing
+            ? "Syncing sources…"
+            : sourceCount
+              ? `${sourceCount} ${sourceCount === 1 ? "source" : "sources"} connected`
+              : "Ready for your first source"}
           <Icon name="down" size={12} />
         </button>
       </div>
