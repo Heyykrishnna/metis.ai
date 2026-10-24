@@ -110,6 +110,8 @@ button {
   top: 16px;
 }
 .workspace {
+  --sidebar-progress: 1;
+  --drawer-progress: 0;
   min-height: 100dvh;
 }
 .sidebar {
@@ -123,6 +125,8 @@ button {
   flex-direction: column;
   z-index: 30;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  transform: translateX(calc((var(--sidebar-progress) - 1) * 100%));
 }
 .brand-row {
   display: flex;
@@ -168,7 +172,7 @@ button {
   background: #f4f5f7;
 }
 .sidebar-collapse {
-  cursor: default;
+  cursor: pointer;
 }
 .sidebar-search {
   width: 100%;
@@ -301,7 +305,7 @@ kbd {
   color: #6b707a;
 }
 .workspace-main {
-  margin-left: var(--sidebar-width);
+  margin-left: calc(var(--sidebar-width) * var(--sidebar-progress));
   min-width: 0;
   min-height: 100dvh;
 }
@@ -367,6 +371,9 @@ kbd {
 }
 .mobile-menu {
   display: none;
+}
+.desktop-menu {
+  display: inline-flex;
 }
 .main-content {
   padding: 24px var(--workspace-gutter) 32px;
@@ -1679,7 +1686,7 @@ td:first-child {
 .toast {
   position: fixed;
   bottom: 24px;
-  left: calc(50% + 122px);
+  left: calc(50% + var(--sidebar-width) * var(--sidebar-progress) / 2);
   transform: translateX(-50%);
   background: #fff;
   border: 1px solid #e5e7eb;
@@ -1742,9 +1749,6 @@ td:first-child {
   .suggestion-card {
     padding-top: 20px;
   }
-  .toast {
-    left: calc(50% + 133px);
-  }
 }
 @media (max-width: 1150px) {
   :root {
@@ -1786,9 +1790,6 @@ td:first-child {
   .help-layout {
     grid-template-columns: 1fr;
   }
-  .toast {
-    left: calc(50% + 109px);
-  }
 }
 @media (max-width: 760px) {
   :root {
@@ -1797,16 +1798,8 @@ td:first-child {
   }
   .sidebar {
     width: 244px;
-    transform: translateX(-100%);
-    visibility: hidden;
-    transition:
-      transform 350ms var(--ease-slide),
-      visibility 350ms;
+    transform: translateX(calc((var(--drawer-progress) - 1) * 100%));
     box-shadow: 10px 0 40px #3439420a;
-  }
-  .sidebar.is-open {
-    visibility: visible;
-    transform: translateX(0);
   }
   .sidebar-collapse {
     cursor: pointer;
@@ -1828,6 +1821,9 @@ td:first-child {
   .mobile-menu {
     display: flex;
     margin-left: -5px;
+  }
+  .desktop-menu {
+    display: none;
   }
   .private-badge,
   .topbar-divider {
@@ -2103,9 +2099,6 @@ td:first-child {
 .help-step p {
   font-size: 12px;
 }
-.sidebar-collapse {
-  display: none;
-}
 @media (max-height: 800px) and (min-width: 761px) {
   .sidebar {
     padding-top: 23px;
@@ -2134,9 +2127,6 @@ td:first-child {
   }
 }
 @media (max-width: 760px) {
-  .sidebar-collapse {
-    display: inline-flex;
-  }
   .mode-button {
     font-size: 9px;
   }

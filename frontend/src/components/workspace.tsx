@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import Link from "next/link";
+import { workspaceSpring } from "@/lib/motion";
 import {
   MAX_FILES,
   MAX_FILE_SIZE,
@@ -59,6 +61,7 @@ import { Orb } from "./ui/orb";
 import { BrandMark } from "./brand-mark";
 import { analysisActivity } from "@/lib/analysis-activity";
 import { useQuestions } from "./use-questions";
+import { useSidebar } from "./use-sidebar";
 import {
   DocumentPreview,
   EmptyState,
@@ -92,7 +95,19 @@ const descriptions: Record<View, string> = {
 export function Workspace() {
   const [view, setView] = useState<View>("Home");
   const [modal, setModal] = useState<Modal>(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const {
+    sidebarOpen,
+    sidebarExpanded,
+    isMobile,
+    sidebarRef,
+    sidebarToggleRef,
+    desktopToggleRef,
+    closeSidebar,
+    openSidebar,
+    toggleSidebar,
+    collapseSidebar,
+  } = useSidebar();
+  const reduced = useReducedMotion();
   const [overview, setOverview] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [mode, setMode] = useState("Ask your data");
@@ -266,7 +281,7 @@ export function Workspace() {
 
   function navigate(next: View) {
     setView(next);
-    setSidebarOpen(false);
+    closeSidebar();
     setQuestion(null);
     setFilter("");
     window.scrollTo({ top: 0, behavior: "instant" });
@@ -760,21 +775,41 @@ export function Workspace() {
       ];
 
   return (
-    <div className="workspace">
+    <motion.div
+      className="workspace"
+      initial={false}
+      animate={{
+        "--sidebar-progress": sidebarExpanded ? 1 : 0,
+        "--drawer-progress": sidebarOpen ? 1 : 0,
+      }}
+      transition={reduced ? { duration: 0 } : workspaceSpring}
+    >
       <a className="skip-link" href="#main-content">
         Skip to content
       </a>
-      {sidebarOpen && (
-        <button
-          className="sidebar-scrim"
-          aria-label="Close navigation"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
+      <AnimatePresence initial={false}>
+        {sidebarOpen && (
+          <motion.button
+            key="navigation-scrim"
+            className="sidebar-scrim"
+            aria-label="Close navigation"
+            onClick={closeSidebar}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: reduced ? 0 : 0.18 }}
+          />
+        )}
+      </AnimatePresence>
       <aside
+        ref={sidebarRef}
         id="workspace-navigation"
-        className={`sidebar ${sidebarOpen ? "is-open" : ""}`}
+        className="sidebar"
         aria-label="Workspace navigation"
+        inert={isMobile ? !sidebarOpen : !sidebarExpanded}
+        aria-hidden={isMobile ? !sidebarOpen : !sidebarExpanded}
+        role={isMobile && sidebarOpen ? "dialog" : undefined}
+        aria-modal={isMobile && sidebarOpen ? true : undefined}
       >
         <div className="brand-row">
           <button
@@ -788,9 +823,18 @@ export function Workspace() {
             </span>
           </button>
           <button
-            className="icon-button sidebar-collapse"
+            className="icon-button sidebar-collapse mobile-menu"
             aria-label="Close navigation"
-            onClick={() => setSidebarOpen(false)}
+            onClick={closeSidebar}
+          >
+            <Icon name="panel" size={18} />
+          </button>
+          <button
+            className="icon-button sidebar-collapse desktop-menu"
+            aria-label="Collapse navigation"
+            aria-expanded={sidebarExpanded}
+            aria-controls="workspace-navigation"
+            onClick={collapseSidebar}
           >
             <Icon name="panel" size={18} />
           </button>
@@ -867,11 +911,24 @@ export function Workspace() {
         <header className="topbar">
           <div className="topbar-left">
             <button
+              ref={desktopToggleRef}
+              className="icon-button desktop-menu"
+              aria-label={
+                sidebarExpanded ? "Collapse navigation" : "Expand navigation"
+              }
+              aria-expanded={sidebarExpanded}
+              aria-controls="workspace-navigation"
+              onClick={toggleSidebar}
+            >
+              <Icon name="panel" size={18} />
+            </button>
+            <button
+              ref={sidebarToggleRef}
               className="icon-button mobile-menu"
               aria-label="Open navigation"
               aria-expanded={sidebarOpen}
               aria-controls="workspace-navigation"
-              onClick={() => setSidebarOpen(true)}
+              onClick={openSidebar}
             >
               <Icon name="menu" />
             </button>
@@ -1594,6 +1651,6 @@ export function Workspace() {
           </button>
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }
