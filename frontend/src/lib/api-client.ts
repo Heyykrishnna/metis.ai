@@ -22,6 +22,8 @@ export type EffectivePolicy = components["schemas"]["EffectivePolicy"];
 export type PolicySimulateInput = components["schemas"]["PolicySimulateInput"];
 export type PolicySimulateResult =
   components["schemas"]["PolicySimulateResult"];
+export type ConversationContextResponse =
+  components["schemas"]["ConversationContextResponse"];
 
 function resolveUrl(path: string, baseUrl?: string): string {
   if (baseUrl) {
@@ -237,6 +239,12 @@ export async function submitFeedback(
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+export async function getRunContext(
+  runId: string,
+): Promise<ConversationContextResponse> {
+  return fetchJson<ConversationContextResponse>(`/v1/runs/${runId}/context`);
 }
 
 export async function getEffectivePolicy(

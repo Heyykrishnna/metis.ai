@@ -1094,6 +1094,100 @@
         }
       }
     },
+    "/v1/runs/{runId}/context": {
+      "parameters": [
+        {
+          "name": "runId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "getRunContext",
+        "x-implementation-status": "planned",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationContextResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Resource limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/runs/{runId}/export/csv": {
       "parameters": [
         {
@@ -7455,6 +7549,489 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 4096
+          }
+        },
+        "additionalProperties": false
+      },
+      "ConversationContextResponse": {
+        "type": "object",
+        "required": [
+          "runId",
+          "parentRunId",
+          "rootRunId",
+          "turnNumber",
+          "activeContext",
+          "delta",
+          "turns"
+        ],
+        "properties": {
+          "runId": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "parentRunId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rootRunId": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "turnNumber": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "activeContext": {
+            "type": "object",
+            "required": [
+              "connectionId",
+              "sources",
+              "metric",
+              "grain",
+              "timeRange",
+              "filters",
+              "confirmedAssumptions"
+            ],
+            "properties": {
+              "connectionId": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+              },
+              "sources": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                "maxItems": 50
+              },
+              "metric": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4096
+              },
+              "grain": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                "maxItems": 20
+              },
+              "timeRange": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "required": [
+                      "start",
+                      "end",
+                      "semantics"
+                    ],
+                    "properties": {
+                      "start": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 4096
+                      },
+                      "end": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 4096
+                      },
+                      "semantics": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 4096
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "filters": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "field",
+                    "operator",
+                    "values"
+                  ],
+                  "properties": {
+                    "field": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 4096
+                    },
+                    "operator": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 4096
+                    },
+                    "values": {
+                      "type": "array",
+                      "items": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "maxLength": 16384
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "boolean"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "maxItems": 100
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "maxItems": 50
+              },
+              "confirmedAssumptions": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                "maxItems": 50
+              }
+            },
+            "additionalProperties": false
+          },
+          "delta": {
+            "type": "object",
+            "required": [
+              "changedFields",
+              "previousValues",
+              "newValues",
+              "changeType",
+              "explanation"
+            ],
+            "properties": {
+              "changedFields": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                "maxItems": 20
+              },
+              "previousValues": {
+                "type": "object",
+                "patternProperties": {
+                  "^.*$": {}
+                }
+              },
+              "newValues": {
+                "type": "object",
+                "patternProperties": {
+                  "^.*$": {}
+                }
+              },
+              "changeType": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "const": "initial"
+                  },
+                  {
+                    "type": "string",
+                    "const": "refinement"
+                  },
+                  {
+                    "type": "string",
+                    "const": "branch"
+                  },
+                  {
+                    "type": "string",
+                    "const": "reset"
+                  },
+                  {
+                    "type": "string",
+                    "const": "clarification"
+                  }
+                ]
+              },
+              "explanation": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4096
+              }
+            },
+            "additionalProperties": false
+          },
+          "turns": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "turnNumber",
+                "runId",
+                "parentRunId",
+                "question",
+                "status",
+                "activeContext",
+                "delta",
+                "createdAt"
+              ],
+              "properties": {
+                "turnNumber": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "runId": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                },
+                "parentRunId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "question": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                "status": {
+                  "enum": [
+                    "answered",
+                    "needs_clarification",
+                    "abstained",
+                    "blocked_by_policy",
+                    "execution_failed",
+                    "timed_out",
+                    "cancelled"
+                  ]
+                },
+                "activeContext": {
+                  "type": "object",
+                  "required": [
+                    "connectionId",
+                    "sources",
+                    "metric",
+                    "grain",
+                    "timeRange",
+                    "filters",
+                    "confirmedAssumptions"
+                  ],
+                  "properties": {
+                    "connectionId": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                    },
+                    "sources": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 4096
+                      },
+                      "maxItems": 50
+                    },
+                    "metric": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 4096
+                    },
+                    "grain": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 4096
+                      },
+                      "maxItems": 20
+                    },
+                    "timeRange": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "required": [
+                            "start",
+                            "end",
+                            "semantics"
+                          ],
+                          "properties": {
+                            "start": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 4096
+                            },
+                            "end": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 4096
+                            },
+                            "semantics": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 4096
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "filters": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "field",
+                          "operator",
+                          "values"
+                        ],
+                        "properties": {
+                          "field": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 4096
+                          },
+                          "operator": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 4096
+                          },
+                          "values": {
+                            "type": "array",
+                            "items": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "maxLength": 16384
+                                },
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "boolean"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "maxItems": 100
+                          }
+                        },
+                        "additionalProperties": false
+                      },
+                      "maxItems": 50
+                    },
+                    "confirmedAssumptions": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 4096
+                      },
+                      "maxItems": 50
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "delta": {
+                  "type": "object",
+                  "required": [
+                    "changedFields",
+                    "previousValues",
+                    "newValues",
+                    "changeType",
+                    "explanation"
+                  ],
+                  "properties": {
+                    "changedFields": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 4096
+                      },
+                      "maxItems": 20
+                    },
+                    "previousValues": {
+                      "type": "object",
+                      "patternProperties": {
+                        "^.*$": {}
+                      }
+                    },
+                    "newValues": {
+                      "type": "object",
+                      "patternProperties": {
+                        "^.*$": {}
+                      }
+                    },
+                    "changeType": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "const": "initial"
+                        },
+                        {
+                          "type": "string",
+                          "const": "refinement"
+                        },
+                        {
+                          "type": "string",
+                          "const": "branch"
+                        },
+                        {
+                          "type": "string",
+                          "const": "reset"
+                        },
+                        {
+                          "type": "string",
+                          "const": "clarification"
+                        }
+                      ]
+                    },
+                    "explanation": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 4096
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "additionalProperties": false
+            },
+            "maxItems": 100
           }
         },
         "additionalProperties": false
