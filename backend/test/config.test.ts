@@ -35,3 +35,9 @@ it("starts development safely without optional dependencies", () => {
     PORT: 3001,
   });
 });
+
+it("rejects a malformed migration URL without exposing its value", () => {
+  expect(() =>
+    readConfig({ DATABASE_URL_UNPOOLED: "private-invalid-url" }),
+  ).toThrow("Invalid configuration: DATABASE_URL_UNPOOLED");
+});
