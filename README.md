@@ -26,7 +26,7 @@ Every completed analysis is an inspectable record, not a chat reply:
 
 If a definition is ambiguous, metis.ai asks one focused question instead of guessing. If verification fails, it abstains.
 
-The full architecture, analysis process, numeric formulas, safety algorithm, measured scorecard, and comparison with generic LLMs are in [How metis.ai works](docs/how-metis-works.md).
+The full architecture, analysis process, numeric formulas, safety algorithm, measured scorecard, and comparison with generic LLMs are in [How metis.ai works](docs/how-metis-works.md) and [Groq analytical engine architecture](docs/engineering/groq-architecture.md).
 
 ## Principles
 
@@ -77,7 +77,7 @@ node scripts/test-database.mjs
 npm --prefix backend run test:files:live
 ```
 
-`check` runs lint, formatting, TypeScript, behavior tests, contract consistency and production builds for both applications. The database runner uses a disposable local PostgreSQL database and tests backup/restore. The live file check creates a synthetic file in the configured Neon database, verifies exact download, model-planned calculations and restart persistence, then deletes its own file. It requires the configured local model to be running.
+`check` runs lint, formatting, TypeScript, behavior tests, contract consistency and production builds for both applications. The database runner uses a disposable local PostgreSQL database and tests backup/restore. The live file check creates a synthetic file in the configured Neon database, verifies exact download, grouped calculations and restart persistence, then deletes its own file.
 
 Earlier phase reports describe their scoped fixtures and evaluations; they are not a guarantee that arbitrary questions can be answered. [The foundation guide](docs/engineering/foundation.md) retains isolated fixture setup and recovery procedures.
 

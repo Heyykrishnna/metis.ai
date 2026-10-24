@@ -8,6 +8,7 @@ import {
 } from "@/lib/file-presentation";
 import { formatFileSize, type LocalDocument } from "@/lib/local-files";
 import { Icon } from "./icon";
+import { FormattedMarkdown } from "./ui/formatted-markdown";
 import { ResultsTable } from "./workspace-views";
 
 const fileColumnLabels: Record<string, string> = {
@@ -148,7 +149,7 @@ export function FileAnswer({
             View schema <Icon name="arrow" size={12} />
           </button>
         </div>
-        <p className="answer-prose">{answer.answerText}</p>
+        <FormattedMarkdown content={answer.answerText} />
         <Definition analysis={analysis} />
         <Coverage analysis={analysis} />
       </section>

@@ -53,6 +53,7 @@ import { ClarificationPanel } from "./clarification-panel";
 import { FileAnswer, FileEvidence, FileSchema } from "./file-answer";
 import { CodeBlock } from "./ui/code-block";
 import { FileDropzone } from "./ui/file-dropzone";
+import { FormattedMarkdown } from "./ui/formatted-markdown";
 import { useQuestions } from "./use-questions";
 import {
   DocumentPreview,
@@ -1044,17 +1045,13 @@ export function Workspace() {
                                   ? "FILE-GROUNDED RESULT"
                                   : "VERIFIED ANSWER"}
                             </span>
-                            <p
-                              style={{
-                                font: "18px/1.6 Georgia, serif",
-                                color: "#343942",
-                                margin: "10px 0",
-                              }}
-                            >
-                              {question.result.answer.status === "answered"
-                                ? question.result.answer.answerText
-                                : question.result.answer.reason}
-                            </p>
+                            <FormattedMarkdown
+                              content={
+                                question.result.answer.status === "answered"
+                                  ? question.result.answer.answerText
+                                  : question.result.answer.reason
+                              }
+                            />
                           </div>
                         ) : (
                           <EmptyState

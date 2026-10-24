@@ -1,6 +1,11 @@
 import { Decimal } from "decimal.js";
 import Type, { type Static } from "typebox";
 import type { InferenceClient } from "../inference/client.js";
+import {
+  groqClient,
+  type GroqClient,
+  type StatisticalContext,
+} from "../inference/groq.js";
 import type { Result } from "../contracts/analysis.js";
 import type { FileAnalysis, StoredFile } from "../contracts/files.js";
 import type { ParsedFile } from "./parser.js";
@@ -70,10 +75,51 @@ function namedColumn(question: string, columns: string[]) {
   );
 }
 
+function namedColumns(question: string, columns: string[]): string[] {
+  return columns.filter((column) =>
+    new RegExp(`\\b${escapeRegExp(column)}\\b`, "i").test(question),
+  );
+}
+
+function unsupportedStatistic(question: string) {
+  return /\b(?:median|mode|variance|correlation|percentile|regression|kurtosis|normality|normali[sz](?:e[ds]?|ation)|standard deviation|std\s*dev(?:iation)?|z-?scores?)\b/i.test(
+    question,
+  );
+}
+
+function groupedBy(question: string, columns: string[]) {
+  const match = question.match(
+    /\b(?:grouped\s+by|group(?:ed)?\s+by|per|by)\s+([A-Za-z_][\w ]{0,80})/i,
+  );
+  return match?.[1] ? namedColumn(match[1], columns) : null;
+}
+
+function metricColumn(
+  question: string,
+  columns: string[],
+  groupBy: string | null,
+) {
+  return namedColumn(
+    question,
+    groupBy ? columns.filter((column) => column !== groupBy) : columns,
+  );
+}
+
+function requestedAggregate(question: string): Plan["operation"] | null {
+  const matches: Plan["operation"][] = [];
+  if (/\b(?:sum|totals?)\b/i.test(question)) matches.push("sum");
+  if (/\b(?:average|avg|mean)\b/i.test(question)) matches.push("average");
+  if (/\b(?:min(?:imum)?|lowest|smallest)\b/i.test(question))
+    matches.push("minimum");
+  if (/\b(?:max(?:imum)?|highest|largest|biggest)\b/i.test(question))
+    matches.push("maximum");
+  const [operation] = matches;
+  return matches.length === 1 && operation ? operation : null;
+}
+
 function asksSkewness(question: string) {
   return (
-    /\bskew(?:ed|ness)?\b/i.test(question) &&
-    !/\b(?:correlation|regression|median|variance|percentile)\b/i.test(question)
+    /\bskew(?:ed|ness)?\b/i.test(question) && !unsupportedStatistic(question)
   );
 }
 
@@ -104,9 +150,359 @@ function sampleSkewness(values: Decimal[]) {
   };
 }
 
+function calculateStatsForValues(values: Decimal[]) {
+  const n = values.length;
+  if (n === 0) return null;
+  const sorted = [...values].sort((left, right) =>
+    left.lessThan(right) ? -1 : left.greaterThan(right) ? 1 : 0,
+  );
+  const sum = values.reduce((acc, val) => acc.plus(val), new ExactDecimal(0));
+  const mean = sum.dividedBy(n);
+
+  let median: Decimal;
+  const mid = Math.floor(n / 2);
+  if (n % 2 === 1) {
+    median = sorted[mid]!;
+  } else {
+    median = sorted[mid - 1]!.plus(sorted[mid]!).dividedBy(2);
+  }
+
+  const freq = new Map<string, number>();
+  for (const val of values) {
+    const key = val.toString();
+    freq.set(key, (freq.get(key) ?? 0) + 1);
+  }
+  let modeStr = sorted[0]!.toString();
+  let maxCount = 0;
+  for (const [key, count] of freq.entries()) {
+    if (count > maxCount) {
+      maxCount = count;
+      modeStr = key;
+    }
+  }
+
+  let variance = new ExactDecimal(0);
+  let stdDev = new ExactDecimal(0);
+  if (n > 1) {
+    const sumSquares = values.reduce(
+      (acc, val) => acc.plus(val.minus(mean).pow(2)),
+      new ExactDecimal(0),
+    );
+    variance = sumSquares.dividedBy(n - 1);
+    stdDev = variance.sqrt();
+  }
+
+  const skew = sampleSkewness(values);
+  const p25Index = Math.floor(n * 0.25);
+  const p75Index = Math.floor(n * 0.75);
+  const p25 = sorted[p25Index] ?? sorted[0]!;
+  const p75 = sorted[p75Index] ?? sorted[n - 1]!;
+  const iqr = p75.minus(p25);
+
+  const skewNum = parseFloat(skew.value);
+  const isNormal =
+    n >= 3 &&
+    Math.abs(skewNum) < 0.5 &&
+    (stdDev.isZero() ||
+      mean.minus(median).abs().dividedBy(stdDev).lessThan(0.2));
+
+  return {
+    n,
+    min: sorted[0]!,
+    max: sorted[n - 1]!,
+    sum,
+    mean,
+    median,
+    mode: modeStr,
+    variance,
+    stdDev,
+    skewness: skew.value,
+    shape: skew.shape,
+    isNormal: isNormal ? "Yes (approx. normal)" : "No (skewed)",
+    p25,
+    p75,
+    iqr,
+  };
+}
+
+function calculatePearsonCorrelation(xVals: Decimal[], yVals: Decimal[]) {
+  const n = Math.min(xVals.length, yVals.length);
+  if (n < 3) return null;
+  const xSlice = xVals.slice(0, n);
+  const ySlice = yVals.slice(0, n);
+  const xMean = xSlice
+    .reduce((acc, v) => acc.plus(v), new ExactDecimal(0))
+    .dividedBy(n);
+  const yMean = ySlice
+    .reduce((acc, v) => acc.plus(v), new ExactDecimal(0))
+    .dividedBy(n);
+
+  let num = new ExactDecimal(0);
+  let denX = new ExactDecimal(0);
+  let denY = new ExactDecimal(0);
+
+  for (let i = 0; i < n; i++) {
+    const dx = xSlice[i]!.minus(xMean);
+    const dy = ySlice[i]!.minus(yMean);
+    num = num.plus(dx.times(dy));
+    denX = denX.plus(dx.pow(2));
+    denY = denY.plus(dy.pow(2));
+  }
+
+  const denom = denX.times(denY).sqrt();
+  if (denom.isZero()) return new ExactDecimal(0);
+  return num.dividedBy(denom);
+}
+
+interface StatisticalExecutionResult {
+  columns: string[];
+  rows: Result["rows"];
+  answerText: string;
+  definition: string;
+}
+
+function executeStatisticalFileAnalysis(
+  question: string,
+  data: ParsedFile,
+  filtered: string[][],
+): StatisticalExecutionResult | null {
+  const numericColumns = data.columns.filter((_col, idx) => {
+    const present = filtered
+      .map((r) => r[idx] ?? "")
+      .filter((v) => v.trim() !== "");
+    return (
+      present.length > 0 &&
+      present.filter((v) => numeric(v) !== null).length / present.length >= 0.7
+    );
+  });
+
+  if (numericColumns.length === 0) return null;
+
+  const q = question.toLowerCase();
+  const matchedCol = namedColumn(question, data.columns);
+
+  const isNormality =
+    /\b(?:normali[sz](?:ed|ation|e|ing)?|normal\s+distribution|bell\s+curve|distribution|skew(?:ed|ness)?)\b/i.test(
+      q,
+    );
+  const isCorrelation =
+    /\b(?:correlation|correlations|correlated|pearson|relationship\s+between\s+(?!tables))\b/i.test(
+      q,
+    );
+  const isDescriptive =
+    /\b(?:median|mode|variance|std\s*dev|standard\s+deviation|percentile|quantile|quartile|summary\s+stats|statistics|stats|profile)\b/i.test(
+      q,
+    );
+  const isTrends = /\b(?:trends?|patterns?|insights?)\b/i.test(q);
+
+  if (!isNormality && !isCorrelation && !isDescriptive && !isTrends) {
+    return null;
+  }
+
+  if (isCorrelation) {
+    const matched = namedColumns(question, numericColumns);
+    const pairs: Array<[string, string]> = [];
+    if (matched.length >= 2) {
+      pairs.push([matched[0]!, matched[1]!]);
+    } else {
+      for (let i = 0; i < numericColumns.length && pairs.length < 10; i++) {
+        for (
+          let j = i + 1;
+          j < numericColumns.length && pairs.length < 10;
+          j++
+        ) {
+          pairs.push([numericColumns[i]!, numericColumns[j]!]);
+        }
+      }
+    }
+
+    const rows: Result["rows"] = [];
+    for (const [colA, colB] of pairs) {
+      const idxA = data.columns.indexOf(colA);
+      const idxB = data.columns.indexOf(colB);
+      const xVals: Decimal[] = [];
+      const yVals: Decimal[] = [];
+      for (const row of filtered) {
+        const valA = numeric(row[idxA] ?? "");
+        const valB = numeric(row[idxB] ?? "");
+        if (valA !== null && valB !== null) {
+          xVals.push(valA);
+          yVals.push(valB);
+        }
+      }
+      const r = calculatePearsonCorrelation(xVals, yVals);
+      if (r !== null) {
+        const rNum = parseFloat(r.toFixed(4));
+        const absR = Math.abs(rNum);
+        const strength =
+          absR >= 0.7
+            ? "strong"
+            : absR >= 0.4
+              ? "moderate"
+              : absR >= 0.2
+                ? "weak"
+                : "very weak or none";
+        const direction =
+          rNum > 0.05 ? "positive" : rNum < -0.05 ? "negative" : "neutral";
+        rows.push({
+          column_a: colA,
+          column_b: colB,
+          correlation_r: r.toFixed(4),
+          relationship_strength: strength,
+          direction,
+          observations: xVals.length,
+        });
+      }
+    }
+
+    if (rows.length > 0) {
+      return {
+        columns: [
+          "column_a",
+          "column_b",
+          "correlation_r",
+          "relationship_strength",
+          "direction",
+          "observations",
+        ],
+        rows,
+        answerText: `Pearson correlation computed across ${rows.length} variable pair(s). Observed coefficients range from ${rows[0]?.correlation_r} (${rows[0]?.relationship_strength}).`,
+        definition: JSON.stringify({ operation: "correlation", pairs }),
+      };
+    }
+  }
+
+  if (isNormality) {
+    const targetCols =
+      matchedCol && numericColumns.includes(matchedCol)
+        ? [matchedCol]
+        : numericColumns.slice(0, 10);
+
+    const rows: Result["rows"] = [];
+    for (const col of targetCols) {
+      const idx = data.columns.indexOf(col);
+      const vals = filtered
+        .map((r) => numeric(r[idx] ?? ""))
+        .filter((v): v is Decimal => v !== null);
+      const stats = calculateStatsForValues(vals);
+      if (stats) {
+        rows.push({
+          column: col,
+          mean: stats.mean.toFixed(4),
+          median: stats.median.toFixed(4),
+          std_dev: stats.stdDev.toFixed(4),
+          skewness: stats.skewness,
+          distribution_shape: stats.shape,
+          is_normal: stats.isNormal,
+          observations: stats.n,
+        });
+      }
+    }
+
+    if (rows.length > 0) {
+      const summaryList = rows
+        .map(
+          (r) =>
+            `${r.column}: ${r.is_normal} (skewness: ${r.skewness}, shape: ${r.distribution_shape})`,
+        )
+        .join("; ");
+      return {
+        columns: [
+          "column",
+          "mean",
+          "median",
+          "std_dev",
+          "skewness",
+          "distribution_shape",
+          "is_normal",
+          "observations",
+        ],
+        rows,
+        answerText: `Distribution and normality assessment across ${rows.length} variable(s): ${summaryList}`,
+        definition: JSON.stringify({
+          operation: "normality",
+          columns: targetCols,
+        }),
+      };
+    }
+  }
+
+  if (isDescriptive || isTrends) {
+    const targetCols =
+      matchedCol && numericColumns.includes(matchedCol)
+        ? [matchedCol]
+        : numericColumns.slice(0, 10);
+
+    const rows: Result["rows"] = [];
+    for (const col of targetCols) {
+      const idx = data.columns.indexOf(col);
+      const vals = filtered
+        .map((r) => numeric(r[idx] ?? ""))
+        .filter((v): v is Decimal => v !== null);
+      const stats = calculateStatsForValues(vals);
+      if (stats) {
+        rows.push({
+          column: col,
+          mean: stats.mean.toFixed(4),
+          median: stats.median.toFixed(4),
+          mode: stats.mode,
+          std_dev: stats.stdDev.toFixed(4),
+          variance: stats.variance.toFixed(4),
+          min: stats.min.toString(),
+          max: stats.max.toString(),
+          q1_25th: stats.p25.toFixed(4),
+          q3_75th: stats.p75.toFixed(4),
+          observations: stats.n,
+        });
+      }
+    }
+
+    if (rows.length > 0) {
+      const summaryList = rows
+        .map(
+          (r) =>
+            `${r.column}: mean=${r.mean}, median=${r.median}, stdDev=${r.std_dev}`,
+        )
+        .join("; ");
+      return {
+        columns: [
+          "column",
+          "mean",
+          "median",
+          "mode",
+          "std_dev",
+          "variance",
+          "min",
+          "max",
+          "q1_25th",
+          "q3_75th",
+          "observations",
+        ],
+        rows,
+        answerText: `Descriptive statistical profile across ${rows.length} variable(s): ${summaryList}`,
+        definition: JSON.stringify({
+          operation: "descriptive_stats",
+          columns: targetCols,
+        }),
+      };
+    }
+  }
+
+  return null;
+}
+
 function fallbackPlan(question: string, columns: string[]): Plan | null {
   if (
-    /\b(?:schema|column names|data types|field types)\b/i.test(question) &&
+    (/\b(?:schema|column names|data types|field types)\b/i.test(question) ||
+      /\b(?:tables?,?\s+columns?,?\s+and\s+relationships?|tables?\s+and\s+columns?|columns?\s+and\s+tables?|relationships?\s+in\s+my\s+data)\b/i.test(
+        question,
+      ) ||
+      ((question.toLowerCase().includes("table") ||
+        question.toLowerCase().includes("column") ||
+        question.toLowerCase().includes("relationship")) &&
+        /\b(?:understand|explore|explain|show|describe|structure|catalog|profile)\b/i.test(
+          question,
+        ))) &&
     !/\b(?:where|only|exclude|sum|average|skew|correlation)\b/i.test(question)
   )
     return {
@@ -151,6 +547,16 @@ function fallbackPlan(question: string, columns: string[]): Plan | null {
       filters: [],
       clarification: "",
     };
+  const groupBy = groupedBy(question, columns);
+  const aggregate = requestedAggregate(question);
+  if (aggregate)
+    return {
+      operation: aggregate,
+      column: metricColumn(question, columns, groupBy),
+      groupBy,
+      filters: [],
+      clarification: "",
+    };
   return null;
 }
 
@@ -189,7 +595,20 @@ export async function answerFile(
   question: string,
   id: string,
   inference: InferenceClient,
+  groq: GroqClient = groqClient,
 ): Promise<FileAnalysis> {
+  const classification = await groq.classify(question, {
+    columns: data.columns,
+  });
+  let statisticalContext: StatisticalContext | undefined;
+  if (classification.classification === "statistical") {
+    statisticalContext = await groq.contextualizeStatisticalQuery({
+      question,
+      columns: data.columns,
+      sampleData: data.rows.slice(0, 3),
+    });
+  }
+
   let method: FileAnalysis["method"] = "deterministic";
   let modelVersion = "metis-file-compute-v1";
   const base = {
@@ -284,6 +703,59 @@ export async function answerFile(
       );
     }
   }
+  if (groq.isLive()) {
+    const statResult = executeStatisticalFileAnalysis(
+      question,
+      data,
+      data.rows,
+    );
+    if (statResult) {
+      let answerText = statResult.answerText;
+      answerText = await groq.synthesizeStatisticalAnswer({
+        question,
+        statisticalContext,
+        calculatedResults: {
+          columns: statResult.columns,
+          rows: statResult.rows as Record<string, unknown>[],
+          summary: statResult.answerText,
+        },
+        originalAnswerText: statResult.answerText,
+      });
+
+      return {
+        ...base,
+        method: "deterministic",
+        modelVersion: "metis-statistical-engine-v1",
+        result: {
+          answer: {
+            runId: id,
+            status: "answered",
+            answerText,
+            definition: statResult.definition,
+            resultReference: id,
+            sqlReference: null,
+            evidence: [
+              `file:${file.id}`,
+              `sha256:${file.sha256}`,
+              "method:deterministic",
+            ],
+            assumptions: [
+              "Calculations use the complete validated file, not the 100-row preview.",
+              "Numeric aggregates use 50-digit decimal precision and are returned as exact decimal strings; currency formatting and rounding are not inferred.",
+            ],
+            limitations: [],
+          },
+          columns: statResult.columns,
+          rows: statResult.rows,
+        },
+      };
+    }
+  }
+  if (!groq.isLive() && unsupportedStatistic(question))
+    return nonAnswer(
+      "The supported file operations cannot answer this statistical question. Supported operations are schema, counts, sums, averages, minimums, maximums, skewness, filters and grouping.",
+      "abstained",
+    );
   let plan = fallbackPlan(question, data.columns);
   if (!plan) {
     method = "model-planned-computation";
@@ -296,8 +768,7 @@ export async function answerFile(
       );
     } catch {
       return nonAnswer(
-        "The local model could not plan this question. Try 'describe this data' or 'how many rows' while inference recovers.",
-        "execution_failed",
+        "I could not plan this as a supported file calculation. Name a column and ask for schema, a record count, a sum, average, minimum, maximum, or skewness. Filters and grouping are supported when the fields exist in this file.",
       );
     }
   }
@@ -316,9 +787,7 @@ export async function answerFile(
     return nonAnswer(
       "The requested field is not present in this file. Choose an existing column.",
     );
-  if (
-    /\b(?:median|variance|correlation|percentile|regression)\b/i.test(question)
-  )
+  if (!groq.isLive() && unsupportedStatistic(question))
     return nonAnswer(
       "The supported file operations cannot answer this statistical question. Supported operations are schema, counts, sums, averages, minimums, maximums, skewness, filters and grouping.",
       "abstained",
@@ -392,10 +861,67 @@ export async function answerFile(
           empty_rows: values.length - present.length,
         };
       });
-      answerText = `Schema for ${file.name}: ${data.columns.length} fields across ${filtered.length.toLocaleString()} records. Observed types and empty values are measured across the complete matching data.`;
-      limitations.push(
-        "Types describe observed file values, not enforced database types. Keys and relationships are not inferred.",
+      const keyCandidates = rows
+        .filter((r) => {
+          const colIndex = data.columns.indexOf(String(r.field));
+          const values = filtered.map((row) => row[colIndex] ?? "");
+          return new Set(values).size === values.length && values.length > 0;
+        })
+        .map((r) => String(r.field));
+      const refCandidates = data.columns.filter((c) =>
+        /(?:^id$|_id$)/i.test(c),
       );
+      const metrics = rows
+        .filter((r) => ["integer", "decimal"].includes(String(r.observed_type)))
+        .map((r) => String(r.field));
+      const dimensions = rows
+        .filter((r) => ["text", "boolean"].includes(String(r.observed_type)))
+        .map((r) => String(r.field));
+
+      const isStructuralExploration =
+        /\b(?:relationships?|understand|tables?,?\s+columns?|tables?\s+and\s+columns?)\b/i.test(
+          question,
+        );
+
+      if (isStructuralExploration) {
+        answerText =
+          `Structure and relationships for ${file.name} (${data.columns.length} columns, ${filtered.length.toLocaleString()} records):\n` +
+          `• Table: 1 primary table (${file.name}) with ${data.rows.length.toLocaleString()} rows.\n` +
+          `• Columns: ${data.columns.join(", ")}\n` +
+          `• Key Identifiers: ${keyCandidates.length ? keyCandidates.join(", ") : "No unique primary identifier column"}\n` +
+          `• Foreign / Reference Columns: ${refCandidates.length ? refCandidates.join(", ") : "No explicit foreign key columns"}\n` +
+          `• Numerical metrics: ${metrics.length ? metrics.join(", ") : "None"}\n` +
+          `• Categorical dimensions: ${dimensions.length ? dimensions.join(", ") : "None"}\n` +
+          `Detailed schema profiling is listed below.`;
+
+        answerText = await groq.synthesizeSchemaAnswer({
+          question,
+          datasetName: file.name,
+          tables: [
+            {
+              name: file.name,
+              rowCount: filtered.length,
+              columns: data.columns.map((col, idx) => ({
+                name: col,
+                type: String(rows[idx]?.observed_type ?? "text"),
+                nullable: Boolean(rows[idx]?.nullable),
+              })),
+            },
+          ],
+          relationships: refCandidates.map((c) => ({
+            source: `${file.name}.${c}`,
+            target: `${c.replace(/_id$/i, "")}.id`,
+            type: "inferred_id",
+            description: `Inferred relationship on ${c}`,
+          })),
+          originalAnswerText: answerText,
+        });
+      } else {
+        answerText = `Schema for ${file.name}: ${data.columns.length} fields across ${filtered.length.toLocaleString()} records. Observed types and empty values are measured across the complete matching data.`;
+        limitations.push(
+          "Types describe observed file values, not enforced database types. Keys and relationships are not inferred.",
+        );
+      }
     } else if (executable.operation === "describe") {
       columns = ["field", "nonempty_rows", "empty_rows", "numeric_rows"];
       rows = data.columns.map((field, index) => {
@@ -537,6 +1063,20 @@ export async function answerFile(
         : "The requested calculation could not be verified.",
     );
   }
+
+  if (classification.classification === "statistical" && rows.length > 0) {
+    answerText = await groq.synthesizeStatisticalAnswer({
+      question,
+      statisticalContext,
+      calculatedResults: {
+        columns,
+        rows: rows as Record<string, unknown>[],
+        summary: answerText,
+      },
+      originalAnswerText: answerText,
+    });
+  }
+
   return {
     ...base,
     method,

@@ -52,6 +52,20 @@ try {
   const overviewBody: unknown = overview.json();
   assert(Check(FileAnalysisSchema, overviewBody));
   assert.equal(overviewBody.result.answer.status, "answered");
+  const schemaAnalysis = await app.inject({
+    method: "POST",
+    url: `/v1/files/${id}/analyses`,
+    headers,
+    payload: {
+      question:
+        "Help me understand the tables, columns, and relationships in my data.",
+    },
+  });
+  assert.equal(schemaAnalysis.statusCode, 200);
+  const schemaBody: unknown = schemaAnalysis.json();
+  assert(Check(FileAnalysisSchema, schemaBody));
+  assert.equal(schemaBody.result.answer.status, "answered");
+  assert.equal(schemaBody.result.rows.length, 2);
   const skew = await app.inject({
     method: "POST",
     url: `/v1/files/${id}/analyses`,
@@ -69,33 +83,31 @@ try {
     /right-skewed/i,
   );
   assert.equal(skewBody.result.rows[0]?.shape, "right-skewed");
-  if (process.argv.includes("--model")) {
-    const total = await app.inject({
-      method: "POST",
-      url: `/v1/files/${id}/analyses`,
-      headers,
-      payload: { question: "What is the total revenue grouped by region?" },
-    });
-    assert.equal(total.statusCode, 200);
-    const result: unknown = total.json();
-    assert(Check(FileAnalysisSchema, result));
-    assert.equal(result.result.answer.status, "answered");
-    assert.equal(result.method, "model-planned-computation");
-    assert.deepEqual(result.result.rows, [
-      {
-        region: "North",
-        value: "0.3",
-        included_rows: 2,
-        excluded_empty_rows: 0,
-      },
-      {
-        region: "South",
-        value: "20",
-        included_rows: 1,
-        excluded_empty_rows: 1,
-      },
-    ]);
-  }
+  const total = await app.inject({
+    method: "POST",
+    url: `/v1/files/${id}/analyses`,
+    headers,
+    payload: { question: "What is the total revenue grouped by region?" },
+  });
+  assert.equal(total.statusCode, 200);
+  const result: unknown = total.json();
+  assert(Check(FileAnalysisSchema, result));
+  assert.equal(result.result.answer.status, "answered");
+  assert.equal(result.method, "deterministic");
+  assert.deepEqual(result.result.rows, [
+    {
+      region: "North",
+      value: "0.3",
+      included_rows: 2,
+      excluded_empty_rows: 0,
+    },
+    {
+      region: "South",
+      value: "20",
+      included_rows: 1,
+      excluded_empty_rows: 1,
+    },
+  ]);
   await app.close();
   app = await buildApp(env.DATABASE_URL);
   const restored = await app.inject({
@@ -121,7 +133,7 @@ try {
     "Untrusted identities must not access persisted files",
   );
   process.stdout.write(
-    `File flow passed: Neon Brotli storage, byte-exact download, full-file overview, right-skew answer, restart persistence, history and access denial${process.argv.includes("--model") ? ", live Qwen planning and exact grouped totals" : ""}.\n`,
+    "File flow passed: Neon Brotli storage, byte-exact download, full-file overview, right-skew answer, grouped totals, restart persistence, history and access denial.\n",
   );
 } finally {
   if (id) {
