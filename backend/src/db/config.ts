@@ -1,8 +1,9 @@
 import type { PoolConfig } from "pg";
 import { foundationPolicy } from "../policy.js";
+import { normalizedDatabaseUrl } from "./url.js";
 
 export function metadataPoolConfig(databaseUrl: string): PoolConfig {
-  const url = new URL(databaseUrl);
+  const url = normalizedDatabaseUrl(databaseUrl);
   const neon = url.hostname.endsWith(".neon.tech");
   if (
     neon &&

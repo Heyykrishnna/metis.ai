@@ -19,3 +19,19 @@ it("rejects a Neon TLS downgrade", () => {
     ),
   ).toThrow("Neon requires verified TLS");
 });
+
+it.each(["EP-EXAMPLE.NEON.TECH", "ep-example.neon.tech."])(
+  "keeps TLS enforcement for equivalent hostname %s",
+  (host) => {
+    expect(() =>
+      metadataPoolConfig(
+        `postgresql://user:synthetic@${host}/db?sslmode=disable`,
+      ),
+    ).toThrow("Neon requires verified TLS");
+    expect(
+      metadataPoolConfig(
+        `postgresql://user:synthetic@${host}/db?sslmode=require`,
+      ).ssl,
+    ).toEqual({ rejectUnauthorized: true });
+  },
+);

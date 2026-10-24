@@ -3,6 +3,7 @@ import { readMigrationFiles } from "drizzle-orm/migrator";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { env } from "../src/config.js";
 import { createMetadataDb } from "../src/db/index.js";
+import { normalizedDatabaseUrl } from "../src/db/url.js";
 import { verifyMetadataSchema } from "../src/db/verify.js";
 
 const command = process.argv[2] ?? "check";
@@ -13,7 +14,10 @@ const databaseUrl =
     ? (env.DATABASE_URL_UNPOOLED ?? env.DATABASE_URL)
     : env.DATABASE_URL;
 if (!databaseUrl) throw new Error("DATABASE_URL is required");
-if (command === "migrate" && new URL(databaseUrl).hostname.includes("-pooler."))
+if (
+  command === "migrate" &&
+  normalizedDatabaseUrl(databaseUrl).hostname.includes("-pooler.")
+)
   throw new Error("Use DATABASE_URL_UNPOOLED for migrations");
 const { db, pool } = createMetadataDb(databaseUrl);
 try {
