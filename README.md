@@ -26,7 +26,7 @@ Every completed analysis is an inspectable record, not a chat reply:
 
 If a definition is ambiguous, metis.ai asks one focused question instead of guessing. If verification fails, it abstains.
 
-The full architecture, analysis process, numeric formulas, safety algorithm, measured scorecard, and comparison with generic LLMs are in [How metis.ai works](docs/how-metis-works.md) and [Groq analytical engine architecture](docs/engineering/groq-architecture.md).
+The full architecture, analysis process, numeric formulas, safety algorithm, measured scorecard, and comparison with generic LLMs are in [Master System Documentation](METIS_SYSTEM_DOCUMENTATION.md), [How metis.ai works](docs/how-metis-works.md), and [Groq analytical engine architecture](docs/engineering/groq-architecture.md).
 
 ## Principles
 
