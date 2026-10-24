@@ -144,6 +144,10 @@ export class AnalysisOrchestrator {
     this.metadataDb = deps.metadataDb ?? null;
   }
 
+  getAdapter(): ConnectorAdapter {
+    return this.adapter;
+  }
+
   subscribeEvents(
     runId: string,
     listener: (event: RunEvent) => void,
