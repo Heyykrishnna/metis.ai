@@ -139,6 +139,34 @@ describe("inference client", () => {
       );
     });
 
+    it("resolves OpenRouter defaults when OpenRouter api key is passed", async () => {
+      const mockFetch = async () =>
+        new Response(
+          JSON.stringify({
+            choices: [
+              {
+                message: {
+                  content: JSON.stringify({
+                    answer: "openrouter answer",
+                    confidence: 1.0,
+                  }),
+                },
+              },
+            ],
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+
+      const client = new NemotronInferenceClient({
+        apiKey: "sk-or-v1-test-key",
+        fetcher: mockFetch as unknown as typeof fetch,
+      });
+
+      const result = await client.generateStructured("test prompt", TestSchema);
+      expect(result).toEqual({ answer: "openrouter answer", confidence: 1.0 });
+      expect(client.modelVersion).toBe("nvidia/nemotron-3.5-lightning:free");
+    });
+
     it("extracts JSON even when wrapped in markdown code blocks", async () => {
       const mockFetch = async () =>
         new Response(
@@ -217,11 +245,25 @@ describe("inference client", () => {
       }
     });
 
+    it("returns NemotronInferenceClient when OPENROUTER_API_KEY is present", () => {
+      const original = process.env.OPENROUTER_API_KEY;
+      process.env.OPENROUTER_API_KEY = "sk-or-dummy";
+      try {
+        const client = createInferenceClient();
+        expect(client).toBeInstanceOf(NemotronInferenceClient);
+      } finally {
+        if (original === undefined) delete process.env.OPENROUTER_API_KEY;
+        else process.env.OPENROUTER_API_KEY = original;
+      }
+    });
+
     it("returns OllamaInferenceClient when no cloud credentials are provided", () => {
+      const originalOr = process.env.OPENROUTER_API_KEY;
       const originalHf = process.env.HF_TOKEN;
       const originalNv = process.env.NVIDIA_API_KEY;
       const originalProv = process.env.INFERENCE_PROVIDER;
       const originalUrl = process.env.INFERENCE_BASE_URL;
+      delete process.env.OPENROUTER_API_KEY;
       delete process.env.HF_TOKEN;
       delete process.env.NVIDIA_API_KEY;
       delete process.env.INFERENCE_PROVIDER;
@@ -230,6 +272,8 @@ describe("inference client", () => {
         const client = createInferenceClient();
         expect(client).toBeInstanceOf(OllamaInferenceClient);
       } finally {
+        if (originalOr !== undefined)
+          process.env.OPENROUTER_API_KEY = originalOr;
         if (originalHf !== undefined) process.env.HF_TOKEN = originalHf;
         if (originalNv !== undefined) process.env.NVIDIA_API_KEY = originalNv;
         if (originalProv !== undefined)

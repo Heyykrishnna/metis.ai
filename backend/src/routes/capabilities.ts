@@ -23,14 +23,19 @@ export const capabilitiesRoutes: FastifyPluginAsyncTypebox = async (app) => {
     },
     async () => {
       const defaultModel =
-        process.env.NVIDIA_API_KEY ||
-        process.env.INFERENCE_PROVIDER === "nvidia"
-          ? "nvidia/nemotron-3.5-lightning"
-          : "nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-BF16";
+        process.env.OPENROUTER_API_KEY ||
+        process.env.INFERENCE_PROVIDER === "openrouter"
+          ? "nvidia/nemotron-3.5-lightning:free"
+          : process.env.NVIDIA_API_KEY ||
+              process.env.INFERENCE_PROVIDER === "nvidia"
+            ? "nvidia/nemotron-3.5-lightning-30b-a3b"
+            : "nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-BF16";
       const model = process.env.INFERENCE_MODEL ?? defaultModel;
 
       let inferenceAvailable = false;
       const hasCloudToken = Boolean(
+        (process.env.OPENROUTER_API_KEY &&
+          process.env.OPENROUTER_API_KEY.trim().length > 0) ||
         (process.env.HF_TOKEN && process.env.HF_TOKEN.trim().length > 0) ||
         (process.env.HUGGINGFACE_API_KEY &&
           process.env.HUGGINGFACE_API_KEY.trim().length > 0) ||

@@ -205,7 +205,7 @@ export class OllamaInferenceClient implements InferenceClient {
 
 export interface CloudInferenceClientOptions extends InferenceClientOptions {
   apiKey?: string;
-  provider?: "huggingface" | "nvidia";
+  provider?: "huggingface" | "nvidia" | "openrouter";
 }
 
 export class NemotronInferenceClient implements InferenceClient {
@@ -216,33 +216,59 @@ export class NemotronInferenceClient implements InferenceClient {
   private readonly fetcher: typeof fetch;
 
   constructor(options?: CloudInferenceClientOptions) {
-    const isNvidiaProvider =
-      options?.provider === "nvidia" ||
-      process.env.INFERENCE_PROVIDER === "nvidia" ||
-      Boolean(process.env.NVIDIA_API_KEY && !process.env.HF_TOKEN);
+    const inferredFromApiKey = options?.apiKey?.startsWith("sk-or-")
+      ? "openrouter"
+      : options?.apiKey?.startsWith("hf_")
+        ? "huggingface"
+        : options?.apiKey?.startsWith("nvapi-")
+          ? "nvidia"
+          : undefined;
+
+    const provider =
+      options?.provider ??
+      inferredFromApiKey ??
+      process.env.INFERENCE_PROVIDER?.toLowerCase() ??
+      (process.env.OPENROUTER_API_KEY
+        ? "openrouter"
+        : process.env.NVIDIA_API_KEY
+          ? "nvidia"
+          : "huggingface");
+
+    const isOpenRouter = provider === "openrouter";
+    const isNvidia = provider === "nvidia";
+
+    const defaultBaseUrl = isOpenRouter
+      ? "https://openrouter.ai/api/v1"
+      : isNvidia
+        ? "https://integrate.api.nvidia.com/v1"
+        : "https://router.huggingface.co/v1";
 
     this.baseUrl = (
       options?.baseUrl ??
-      process.env.INFERENCE_BASE_URL ??
-      (isNvidiaProvider
-        ? "https://integrate.api.nvidia.com/v1"
-        : "https://router.huggingface.co/v1")
+      (options?.provider || inferredFromApiKey
+        ? defaultBaseUrl
+        : (process.env.INFERENCE_BASE_URL ?? defaultBaseUrl))
     ).replace(/\/+$/, "");
+
+    const defaultModel = isOpenRouter
+      ? "nvidia/nemotron-3.5-lightning:free"
+      : isNvidia
+        ? "nvidia/nemotron-3.5-lightning-30b-a3b"
+        : "nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-BF16";
 
     this.modelVersion =
       options?.model ??
-      process.env.INFERENCE_MODEL ??
-      (isNvidiaProvider
-        ? "nvidia/nemotron-3.5-lightning"
-        : "nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-BF16");
+      (options?.provider || inferredFromApiKey
+        ? defaultModel
+        : (process.env.INFERENCE_MODEL ?? defaultModel));
 
     this.apiKey =
       options?.apiKey ??
-      process.env.HF_TOKEN ??
-      process.env.HUGGINGFACE_API_KEY ??
-      process.env.NVIDIA_API_KEY ??
-      process.env.NVAPI_KEY ??
-      "";
+      (isOpenRouter
+        ? (process.env.OPENROUTER_API_KEY ?? "")
+        : isNvidia
+          ? (process.env.NVIDIA_API_KEY ?? process.env.NVAPI_KEY ?? "")
+          : (process.env.HF_TOKEN ?? process.env.HUGGINGFACE_API_KEY ?? ""));
 
     this.temperature = options?.temperature ?? 0;
     this.fetcher = options?.fetcher ?? fetch;
@@ -383,6 +409,7 @@ export class NemotronInferenceClient implements InferenceClient {
 export function createInferenceClient(
   options?: InferenceClientOptions,
 ): InferenceClient {
+  const hasOpenRouterKey = Boolean(process.env.OPENROUTER_API_KEY);
   const hasHfToken = Boolean(
     process.env.HF_TOKEN || process.env.HUGGINGFACE_API_KEY,
   );
@@ -392,19 +419,27 @@ export function createInferenceClient(
   const provider = process.env.INFERENCE_PROVIDER?.toLowerCase();
   const baseUrl = options?.baseUrl ?? process.env.INFERENCE_BASE_URL ?? "";
 
+  const isOpenRouter =
+    provider === "openrouter" ||
+    hasOpenRouterKey ||
+    baseUrl.includes("openrouter.ai");
   const isHf =
     provider === "huggingface" ||
-    hasHfToken ||
+    (hasHfToken && !hasOpenRouterKey) ||
     baseUrl.includes("huggingface.co");
   const isNvidia =
     provider === "nvidia" ||
-    (hasNvidiaKey && !hasHfToken) ||
+    (hasNvidiaKey && !hasHfToken && !hasOpenRouterKey) ||
     baseUrl.includes("nvidia.com");
 
-  if (isHf || isNvidia) {
+  if (isOpenRouter || isHf || isNvidia) {
     return new NemotronInferenceClient({
       ...options,
-      provider: isNvidia ? "nvidia" : "huggingface",
+      provider: isOpenRouter
+        ? "openrouter"
+        : isNvidia
+          ? "nvidia"
+          : "huggingface",
     });
   }
 

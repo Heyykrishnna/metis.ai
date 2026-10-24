@@ -76,6 +76,7 @@ export function readConfig(source: NodeJS.ProcessEnv) {
     GROQ_MODEL: source.GROQ_MODEL ?? "openai/gpt-oss-120b",
     HF_TOKEN: source.HF_TOKEN ?? source.HUGGINGFACE_API_KEY,
     NVIDIA_API_KEY: source.NVIDIA_API_KEY ?? source.NVAPI_KEY,
+    OPENROUTER_API_KEY: source.OPENROUTER_API_KEY,
     INFERENCE_PROVIDER: source.INFERENCE_PROVIDER,
     INFERENCE_MODEL: source.INFERENCE_MODEL,
     INFERENCE_BASE_URL: source.INFERENCE_BASE_URL,
