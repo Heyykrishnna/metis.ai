@@ -57,6 +57,10 @@ const frontend = spawn(
 try {
   const health = await waitFor(`http://127.0.0.1:${apiPort}/health`, api);
   assert.deepEqual(await health.json(), { status: "ok" });
+  const live = await fetch(`http://127.0.0.1:${apiPort}/health/live`);
+  assert.deepEqual(await live.json(), { status: "ok" });
+  const ready = await fetch(`http://127.0.0.1:${apiPort}/health/ready`);
+  assert.deepEqual(await ready.json(), { status: "ok" });
   const home = await waitFor(`http://127.0.0.1:${webPort}`, frontend);
   const html = await home.text();
   assert.match(html, /<title>metis\.ai<\/title>/);
