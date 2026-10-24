@@ -141,9 +141,9 @@ export class AnalysisOrchestrator {
         .where(
           workspaceId
             ? and(
-                eq(analysisRuns.id, runId),
-                eq(analysisRuns.workspaceId, workspaceId),
-              )
+              eq(analysisRuns.id, runId),
+              eq(analysisRuns.workspaceId, workspaceId),
+            )
             : eq(analysisRuns.id, runId),
         );
       const row = rows[0];
@@ -505,7 +505,7 @@ export class AnalysisOrchestrator {
           const now = new Date();
           const expiresAt = new Date(
             now.getTime() +
-              foundationPolicy.retention.schemaSnapshotDays * 86400000,
+            foundationPolicy.retention.schemaSnapshotDays * 86400000,
           );
           await this.metadataDb
             .insert(schemaSnapshots)
@@ -620,6 +620,20 @@ ORDER BY current.school_id;`;
 
       this.emitProgress(state, "estimating");
       if (checkAbort()) return state.run;
+
+      if (this.adapter.explain) {
+        try {
+          const estimate = await this.adapter.explain({
+            sql: generatedSql,
+            signal: abortController.signal,
+          });
+          if (estimate.warnings.length > 0) {
+            state.assumptions.push(...estimate.warnings);
+          }
+        } catch {
+          void 0;
+        }
+      }
 
       this.emitProgress(state, "executing");
       if (checkAbort()) return state.run;

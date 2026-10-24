@@ -41,7 +41,14 @@ export const analysisRoutes: FastifyPluginAsyncTypebox = async (app) => {
       const requestId = request.id ?? "req-unknown";
 
       const memoryConn = getMemoryConnection(connectionId, workspaceId);
-      const allowedSchemas = memoryConn?.allowedSchemas ?? ["analytics_clean"];
+      if (!memoryConn) {
+        return reply.status(404).send({
+          code: "not_found",
+          message: "Connection not found in workspace",
+          requestId,
+        });
+      }
+      const allowedSchemas = memoryConn.allowedSchemas;
 
       try {
         const run = await app.orchestrator.executeAnalysis({

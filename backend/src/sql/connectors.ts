@@ -13,10 +13,19 @@ export interface AnalyticalResult {
   rows: readonly Readonly<Record<string, unknown>>[];
 }
 
+export interface ExplainEstimate {
+  estimatedCost: number;
+  estimatedRows: number;
+  planType: string;
+  isSequentialScan: boolean;
+  warnings: string[];
+}
+
 export interface ConnectorAdapter {
   readonly id: string;
   readonly dialect: SqlDialect;
   query(query: AnalyticalQuery): Promise<AnalyticalResult>;
+  explain?(query: AnalyticalQuery): Promise<ExplainEstimate>;
 }
 
 const adapters = new Map<string, ConnectorAdapter>();
