@@ -30,7 +30,7 @@ export function EmptyState({
   return (
     <div className="empty-state">
       <span className="empty-icon">
-        <Icon name={icon} size={26} />
+        <Icon name={icon} size={20} />
       </span>
       <h3>{title}</h3>
       <p>{children}</p>
@@ -168,12 +168,12 @@ export function QuestionList({
           question.status === "executing";
         const needsClarification = question.status === "needs_clarification";
         const dotColor = isAnswered
-          ? "#486653"
+          ? "#515762"
           : isRunning
             ? "#d97706"
             : needsClarification
               ? "#b45309"
-              : "#a3a89e";
+              : "#9ca1ab";
         const statusLabel = question.status
           ? question.status.replace(/_/g, " ")
           : "Draft";
@@ -267,7 +267,13 @@ export function TemplatesView({
   );
 }
 
-export function ResultsTable({ result }: { result: Result }) {
+export function ResultsTable({
+  result,
+  columnLabels = {},
+}: {
+  result: Result;
+  columnLabels?: Record<string, string>;
+}) {
   const answerText =
     result.answer.status === "answered"
       ? result.answer.answerText
@@ -296,7 +302,7 @@ export function ResultsTable({ result }: { result: Result }) {
               <th scope="col">#</th>
               {result.columns.map((column) => (
                 <th scope="col" key={column}>
-                  {column}
+                  {columnLabels[column] ?? column}
                 </th>
               ))}
             </tr>
@@ -312,10 +318,14 @@ export function ResultsTable({ result }: { result: Result }) {
                       {cell === null || cell === undefined || cell === "" ? (
                         <span className="null-value">empty</span>
                       ) : typeof cell === "boolean" ? (
-                        cell ? (
-                          "true"
+                        colName === "nullable" && columnLabels.nullable ? (
+                          cell ? (
+                            "Yes"
+                          ) : (
+                            "No"
+                          )
                         ) : (
-                          "false"
+                          String(cell)
                         )
                       ) : (
                         String(cell)
@@ -373,16 +383,16 @@ export function DirtyRadarView({
               <div>
                 <div className="radar-card-top">
                   <div>
-                    <strong style={{ fontSize: 13, color: "#2d3c26" }}>
+                    <strong style={{ fontSize: 13, color: "#343942" }}>
                       {item.sourceObject}.{item.field}
                     </strong>
-                    <p style={{ fontSize: 11, color: "#64755a" }}>
+                    <p style={{ fontSize: 11, color: "#6b707a" }}>
                       Rule: {item.ruleId}
                     </p>
                   </div>
                   <span className={severityClass}>{severityLabel}</span>
                 </div>
-                <p style={{ fontSize: 12, color: "#41513a", margin: "8px 0" }}>
+                <p style={{ fontSize: 12, color: "#515762", margin: "8px 0" }}>
                   Observed: <em>{item.observedPattern}</em> (
                   {item.sampleCount.toLocaleString()} samples, ~
                   {(item.estimatedPrevalence * 100).toFixed(1)}% prevalence)
@@ -443,10 +453,10 @@ export function CounterfactualView({
         }}
       >
         <div>
-          <h3 style={{ fontSize: 16, color: "#32432a" }}>
+          <h3 style={{ fontSize: 16, color: "#343942" }}>
             Counterfactual Sensitivity Analysis
           </h3>
-          <p style={{ fontSize: 12, color: "#647559" }}>
+          <p style={{ fontSize: 12, color: "#6b707a" }}>
             {counterfactuals.recommendation}
           </p>
         </div>
@@ -463,7 +473,7 @@ export function CounterfactualView({
         </span>
       </div>
 
-      <h4 style={{ fontSize: 13, color: "#485b3f", margin: "14px 0 8px" }}>
+      <h4 style={{ fontSize: 13, color: "#515762", margin: "14px 0 8px" }}>
         Evaluated Variants
       </h4>
       {counterfactuals.variants.map((v) => (
@@ -481,7 +491,7 @@ export function CounterfactualView({
               {v.coverage.denominator.toLocaleString()} rows included
             </span>
           </div>
-          <p style={{ fontSize: 12, color: "#44553c", margin: "6px 0" }}>
+          <p style={{ fontSize: 12, color: "#515762", margin: "6px 0" }}>
             {v.definition} · {v.periodSemantics}
           </p>
           <div className="remediation-box" style={{ margin: "6px 0 0" }}>
@@ -494,7 +504,7 @@ export function CounterfactualView({
         <div className="diff-table-scroll">
           <table style={{ width: "100%", fontSize: 12, textAlign: "left" }}>
             <thead>
-              <tr style={{ borderBottom: "2px solid #e2e8d6" }}>
+              <tr style={{ borderBottom: "2px solid #e5e7eb" }}>
                 <th style={{ padding: "6px 10px" }}>Dimension</th>
                 <th style={{ padding: "6px 10px" }}>Primary Value</th>
                 <th style={{ padding: "6px 10px" }}>Counterfactual Value</th>
@@ -503,7 +513,7 @@ export function CounterfactualView({
             </thead>
             <tbody>
               {counterfactuals.differences.map((d, index) => (
-                <tr key={index} style={{ borderBottom: "1px solid #edf2e4" }}>
+                <tr key={index} style={{ borderBottom: "1px solid #f4f5f7" }}>
                   <td style={{ padding: "6px 10px" }}>{d.dimension}</td>
                   <td style={{ padding: "6px 10px" }}>{d.primaryValue}</td>
                   <td style={{ padding: "6px 10px" }}>
@@ -535,7 +545,7 @@ export function PassportView({ passport }: { passport: QueryCostPassport }) {
           <div className="passport-metric-value">
             {passport.measured.durationMs} ms
           </div>
-          <small style={{ color: "#74866c" }}>
+          <small style={{ color: "#6b707a" }}>
             Budget: {passport.limits.timeoutMs} ms
           </small>
         </div>
@@ -544,7 +554,7 @@ export function PassportView({ passport }: { passport: QueryCostPassport }) {
           <div className="passport-metric-value">
             {passport.measured.rowCount.toLocaleString()}
           </div>
-          <small style={{ color: "#74866c" }}>
+          <small style={{ color: "#6b707a" }}>
             Limit: {passport.limits.maxRows.toLocaleString()}
           </small>
         </div>
@@ -553,14 +563,14 @@ export function PassportView({ passport }: { passport: QueryCostPassport }) {
           <div className="passport-metric-value">
             {formatFileSize(passport.measured.returnedBytes)}
           </div>
-          <small style={{ color: "#74866c" }}>Wire transmission</small>
+          <small style={{ color: "#6b707a" }}>Wire transmission</small>
         </div>
         <div className="passport-card">
           <span className="passport-metric-label">Model Calls</span>
           <div className="passport-metric-value">
             {passport.measured.modelCalls} / {passport.limits.modelCallsLimit}
           </div>
-          <small style={{ color: "#74866c" }}>Inference budget</small>
+          <small style={{ color: "#6b707a" }}>Inference budget</small>
         </div>
       </div>
 
@@ -616,7 +626,7 @@ export function RecipesView({
           </div>
           <span className="eyebrow">{r.metricName}</span>
           <h3>{r.name}</h3>
-          <p style={{ fontSize: 12, color: "#4f6245" }}>{r.question}</p>
+          <p style={{ fontSize: 12, color: "#515762" }}>{r.question}</p>
           <div
             className="sql-viewer-box"
             style={{ margin: "8px 0", padding: 10 }}
@@ -689,10 +699,10 @@ export function SchemaView({
               }}
             >
               <div>
-                <h3 style={{ fontSize: 16, color: "#374b30" }}>
+                <h3 style={{ fontSize: 16, color: "#343942" }}>
                   Connected Schema Constellation
                 </h3>
-                <p style={{ fontSize: 11, color: "#697b5e" }}>
+                <p style={{ fontSize: 11, color: "#6b707a" }}>
                   Snapshot: {constellation.snapshotId.slice(0, 8)} · Hash:{" "}
                   {constellation.schemaHash.slice(0, 10)}
                 </p>
@@ -710,10 +720,10 @@ export function SchemaView({
                 <section className="constellation-table-card" key={node.id}>
                   <div className="constellation-table-header">
                     <div>
-                      <strong style={{ fontSize: 14, color: "#2d3f27" }}>
+                      <strong style={{ fontSize: 14, color: "#343942" }}>
                         {node.name}
                       </strong>
-                      <p style={{ fontSize: 11, color: "#677a5e" }}>
+                      <p style={{ fontSize: 11, color: "#6b707a" }}>
                         {node.rowCount.toLocaleString()} rows · {node.schema}
                       </p>
                     </div>
@@ -742,7 +752,7 @@ export function SchemaView({
                               </span>
                             )}
                           </span>
-                          <span style={{ color: "#77896e", fontSize: 11 }}>
+                          <span style={{ color: "#6b707a", fontSize: 11 }}>
                             {col.type} {col.nullable ? "" : "not null"}
                           </span>
                         </li>
@@ -756,7 +766,7 @@ export function SchemaView({
             {constellation.edges.length > 0 && (
               <div style={{ marginTop: 24 }}>
                 <h4
-                  style={{ fontSize: 13, color: "#394d32", marginBottom: 10 }}
+                  style={{ fontSize: 13, color: "#343942", marginBottom: 10 }}
                 >
                   Schema Graph Relationships ({constellation.edges.length})
                 </h4>
@@ -777,7 +787,7 @@ export function SchemaView({
                           padding: "1px 5px",
                           fontSize: 9,
                           background:
-                            e.confidence === "declared" ? "#d8edd5" : "#edf2e4",
+                            e.confidence === "declared" ? "#e5e7eb" : "#f4f5f7",
                         }}
                       >
                         {e.confidence}
@@ -889,8 +899,8 @@ export function LedgerView({
                       <code
                         style={{
                           fontSize: 11,
-                          color: "#46593e",
-                          background: "#f0f5ea",
+                          color: "#515762",
+                          background: "#f4f5f7",
                           padding: "2px 6px",
                           borderRadius: 4,
                         }}

@@ -235,8 +235,8 @@ export function ConnectionDialog({
                     key={c.id}
                     className="claim-card"
                     style={{
-                      borderColor: isActive ? "#759781" : "#e1e8d4",
-                      background: isActive ? "#f8faf5" : "#ffffff",
+                      borderColor: isActive ? "#6b707a" : "#e5e7eb",
+                      background: isActive ? "#fafafa" : "#ffffff",
                     }}
                   >
                     <div className="claim-header-row">
@@ -252,7 +252,7 @@ export function ConnectionDialog({
                         </span>
                         <div>
                           <strong>{c.name}</strong>
-                          <p style={{ fontSize: 11, color: "#667a5d" }}>
+                          <p style={{ fontSize: 11, color: "#6b707a" }}>
                             {c.engine} · Schemas: {c.allowedSchemas.join(", ")}
                           </p>
                         </div>
@@ -266,7 +266,7 @@ export function ConnectionDialog({
                         alignItems: "center",
                         marginTop: 12,
                         paddingTop: 8,
-                        borderTop: "1px solid #edf2e6",
+                        borderTop: "1px solid #f4f5f7",
                       }}
                     >
                       {isActive ? (
@@ -277,7 +277,7 @@ export function ConnectionDialog({
                             alignItems: "center",
                             gap: 6,
                             fontSize: 12,
-                            color: "#375034",
+                            color: "#343942",
                           }}
                         >
                           Active analysis target
@@ -306,7 +306,7 @@ export function ConnectionDialog({
             </div>
           ) : (
             <div style={{ textAlign: "center", padding: "20px 0" }}>
-              <p style={{ color: "#687a5f", fontSize: 13, marginBottom: 14 }}>
+              <p style={{ color: "#6b707a", fontSize: 13, marginBottom: 14 }}>
                 No database connections configured yet.
               </p>
               <button
@@ -393,8 +393,8 @@ export function ConnectionDialog({
               className="remediation-box"
               style={{
                 marginTop: 12,
-                borderLeftColor: "#486653",
-                background: "#f0f6ec",
+                borderLeftColor: "#515762",
+                background: "#f4f5f7",
               }}
             >
               <div
@@ -402,7 +402,7 @@ export function ConnectionDialog({
                   display: "flex",
                   alignItems: "center",
                   gap: 8,
-                  color: "#355132",
+                  color: "#343942",
                 }}
               >
                 <Icon name="check" size={16} />
@@ -445,7 +445,7 @@ export function ConnectionDialog({
         style={{
           marginTop: 20,
           paddingTop: 14,
-          borderTop: "1px solid #edf2e6",
+          borderTop: "1px solid #f4f5f7",
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",

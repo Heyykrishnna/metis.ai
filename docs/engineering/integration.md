@@ -18,7 +18,7 @@ Ollama must contain `qwen2.5-coder:7b-instruct-q4_K_M`, as pinned in `inference/
 1. Upload CSV, JSON array-of-objects, TXT or Markdown using the workspace.
 2. The API validates UTF-8, names, structure and limits, compresses original bytes using Node's Brotli implementation at quality 5, and saves a `bytea` payload in Neon with SHA-256, original/compressed sizes and parsed metadata. No filesystem upload cache is required. Compression may increase the size of very small files.
 3. The UI selects the saved file. Questions go through the same-origin Next.js proxy to the authenticated API. No separate SQL connection is needed.
-4. Structure and simple record counts work without a model. For other table questions, local Qwen returns a constrained operation plan. The server validates columns and executes supported filtering, grouping, counts and numeric aggregates over the complete validated file. The model does not supply calculated totals.
+4. Structure and simple record counts work without a model. For other table questions, local Qwen returns a constrained operation plan. The server validates columns and executes supported filtering, grouping, counts, full-file schema profiling and numeric aggregates over the complete validated file. The model does not supply calculated totals.
 5. Text answers contain only passages confirmed to exist in the original document. Missing evidence leads to abstention. Unsupported operations or ambiguous metrics require clarification.
 6. Neon stores the question, source hash, method, model identifier and result. Refresh restores files and the latest 50 file analyses. Browser storage retains only draft/bookmark metadata. Clearing browser history does not delete server history. Removing a file cascades deletion of its file analyses.
 7. Original downloads decompress the stored bytes and verify exact size and SHA-256 before returning them. Evidence exports include the result and computation definition; file calculations have no fabricated SQL reference.
@@ -49,3 +49,9 @@ The disposable PostgreSQL runner requires `initdb`, `pg_ctl`, `createdb`, `pg_du
 See `backend/src/files`, `backend/src/routes/files.ts`, `frontend/src/lib/file-client.ts` and `frontend/src/components/workspace.tsx` for the implementation. The additive `0001` migration creates `file_assets` and `file_analyses` without rewriting existing tables.
 
 The live web check calls the running frontend proxy without a browser credential, verifies upload, byte-exact download, model-planned results and persisted history through Next.js → Fastify → Neon, and cleans up its synthetic file. Start `npm run dev` first; use `WEB_URL` to target a different local frontend address.
+
+## Answer presentation and clarification
+
+File answers show supporting result rows, human-readable calculation/filter definitions, and separate source evidence. Schema requests run deterministic profiling over the complete matching file and report observed integer, decimal, boolean, text, mixed or empty fields and observed nullability. These are not enforced database types or inferred keys. Plans with a nonempty clarification cannot become confirmed answers; older contradictory records are flagged in the UI without altering their stored history. Unsupported statistical requests cannot be answered with an unrelated structure summary.
+
+Data-coverage bars are calculated from included/excluded metric rows or nonempty/empty profile cells. They describe data completeness, not calibrated model confidence or a probability of correctness. Unmeasured coverage is explicitly labeled.

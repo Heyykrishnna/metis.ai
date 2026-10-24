@@ -49,6 +49,9 @@ import { navigation, type View, type Modal } from "./workspace-navigation";
 import { HomeView } from "./home-view";
 import { SettingsView } from "./settings-view";
 import { HelpView } from "./help-view";
+import { ClarificationPanel } from "./clarification-panel";
+import { FileAnswer, FileEvidence, FileSchema } from "./file-answer";
+import { CodeBlock } from "./ui/code-block";
 import { FileDropzone } from "./ui/file-dropzone";
 import { useQuestions } from "./use-questions";
 import {
@@ -121,7 +124,6 @@ export function Workspace() {
   const [submittingClarification, setSubmittingClarification] = useState(false);
   const [feedbackRating, setFeedbackRating] = useState<number | null>(null);
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
-  const [copiedSql, setCopiedSql] = useState(false);
 
   const { questions, updateQuestions } = useQuestions();
   const readingRef = useRef(false);
@@ -188,7 +190,9 @@ export function Workspace() {
                 });
                 const other = current.filter(
                   (item) =>
-                    !history.some((analysis) => analysis.id === item.runId),
+                    !history.some((analysis) => analysis.id === item.runId) &&
+                    (!item.fileId ||
+                      files.some((file) => file.id === item.fileId)),
                 );
                 return [...fromServer, ...other].sort(
                   (left, right) => right.createdAt - left.createdAt,
@@ -403,6 +407,7 @@ export function Workspace() {
     try {
       const analysis = await analyzeFile(fileId, text);
       const fields = {
+        text,
         status: analysis.result.answer.status,
         runId: analysis.id,
         result: analysis.result,
@@ -414,6 +419,7 @@ export function Workspace() {
       setQuestion((current) =>
         current?.id === id ? { ...current, ...fields } : current,
       );
+      return true;
     } catch (error) {
       const reason =
         error instanceof Error
@@ -432,13 +438,18 @@ export function Workspace() {
         columns: [],
         rows: [],
       };
-      const fields = { status: "execution_failed", result };
+      const fields = {
+        status: "execution_failed",
+        result,
+        fileAnalysis: undefined,
+      };
       updateQuestions((current) =>
         current.map((item) => (item.id === id ? { ...item, ...fields } : item)),
       );
       setQuestion((current) =>
         current?.id === id ? { ...current, ...fields } : current,
       );
+      return false;
     }
   }
 
@@ -481,30 +492,35 @@ export function Workspace() {
   }
 
   async function handleClarification() {
-    if (!clarificationText.trim() || !question) return;
+    if (!clarificationText.trim() || !question || submittingClarification)
+      return;
     const input = clarificationText.trim();
-    setClarificationText("");
+    const combined = `${question.text}\nClarification: ${input}`;
+    if (question.fileId && combined.length > 4000) {
+      setNotice(
+        "Shorten the clarification so the full question stays under 4,000 characters.",
+      );
+      return;
+    }
     setSubmittingClarification(true);
-    if (question.fileId) {
-      try {
-        await executeFileQuestion(
-          question.id,
-          question.fileId,
-          `${question.text}\nClarification: ${input}`,
-        );
-      } finally {
-        setSubmittingClarification(false);
-      }
-      return;
-    }
-    const connId = question.connectionId ?? activeConnectionId;
-    if (!connId) {
-      setNotice("No database connection available for clarification.");
-      setSubmittingClarification(false);
-      return;
-    }
     try {
-      await executeAnalysisRequest(question.id, input, connId, question.runId);
+      if (question.fileId) {
+        if (await executeFileQuestion(question.id, question.fileId, combined))
+          setClarificationText("");
+      } else {
+        const connId = question.connectionId ?? activeConnectionId;
+        if (!connId) {
+          setNotice("Choose a source before continuing.");
+          return;
+        }
+        await executeAnalysisRequest(
+          question.id,
+          input,
+          connId,
+          question.runId,
+        );
+        setClarificationText("");
+      }
     } finally {
       setSubmittingClarification(false);
     }
@@ -577,12 +593,6 @@ export function Workspace() {
     } catch {
       setNotice("Could not record anomaly review.");
     }
-  }
-
-  function handleCopySql(sqlText: string) {
-    void navigator.clipboard.writeText(sqlText);
-    setCopiedSql(true);
-    setTimeout(() => setCopiedSql(false), 2000);
   }
 
   function removeQuestion(id: string) {
@@ -704,8 +714,30 @@ export function Workspace() {
     item.name.toLowerCase().includes(filter.toLowerCase()),
   );
 
+  const questionDocument = documents.find(
+    (item) => item.id === question?.fileId,
+  );
+
+  function askFileSchema() {
+    if (!question?.fileId) return;
+    const draft: Question = {
+      id: crypto.randomUUID(),
+      text: "Show me the schema of this file",
+      mode: "Explore schema",
+      source: question.source,
+      fileId: question.fileId,
+      createdAt: Date.now(),
+      saved: false,
+      status: "planning",
+    };
+    updateQuestions((current) => [draft, ...current]);
+    setQuestion(draft);
+    setQuestionTab("Overview");
+    void executeFileQuestion(draft.id, question.fileId, draft.text);
+  }
+
   const availableTabs = question?.fileId
-    ? ["Overview", "Results", "Evidence"]
+    ? ["Overview", "Results", "Schema", "Evidence"]
     : [
         "Overview",
         "SQL",
@@ -738,8 +770,8 @@ export function Workspace() {
             aria-label="Metis home"
             onClick={() => navigate("Home")}
           >
-            <span className="brand-mark">
-              <Icon name="sparkles" size={22} />
+            <span className="brand-mark" aria-hidden="true">
+              m
             </span>
             <span>
               metis<span className="brand-ai">.ai</span>
@@ -767,7 +799,7 @@ export function Workspace() {
                 className={`nav-item ${view === item.label ? "active" : ""}`}
                 onClick={() => navigate(item.label)}
               >
-                <Icon name={item.icon} size={18} />
+                <Icon name={item.icon} size={16} />
                 <span>{item.label}</span>
                 {item.label === "Saved questions" &&
                   questions.some((item) => item.saved) && (
@@ -786,19 +818,6 @@ export function Workspace() {
           ))}
         </nav>
         <div className="sidebar-bottom">
-          <div className="workspace-note">
-            <span className="note-spark">
-              <Icon name="sparkles" size={16} />
-            </span>
-            <p>
-              Big questions.
-              <br />
-              <strong>Clearer answers.</strong>
-            </p>
-            <span className="note-decoration" aria-hidden="true">
-              ✧
-            </span>
-          </div>
           <button
             className={`nav-item ${view === "Help & getting started" ? "active" : ""}`}
             onClick={() => navigate("Help & getting started")}
@@ -847,7 +866,7 @@ export function Workspace() {
             </button>
             <span className="breadcrumb">Workspace</span>
             <span className="breadcrumb-divider">/</span>
-            <span>{view === "Home" ? "Overview" : view}</span>
+            <span>{view === "Home" ? "Home" : view}</span>
           </div>
           <div className="topbar-actions">
             <span className="private-badge">
@@ -955,7 +974,7 @@ export function Workspace() {
                       ← Back to questions
                     </button>
                     <div className="analysis-title">
-                      <h2>{question.text}</h2>
+                      <h2>{question.text.split("\nClarification:")[0]}</h2>
                       <button
                         className={`icon-button ${question.saved ? "bookmarked" : ""}`}
                         aria-label={
@@ -968,16 +987,7 @@ export function Workspace() {
                     </div>
                     <div className="document-meta">
                       <span
-                        className="badge"
-                        style={{
-                          background:
-                            question.status === "completed" ||
-                            question.status === "answered"
-                              ? "#daf0db"
-                              : question.status === "needs_clarification"
-                                ? "#fdedcb"
-                                : "#edf2e6",
-                        }}
+                        className={`status-chip ${question.status === "answered" || question.status === "completed" ? "blue" : question.status === "needs_clarification" ? "amber" : "lavender"}`}
                       >
                         {question.status
                           ? question.status.replace(/_/g, " ")
@@ -1003,73 +1013,26 @@ export function Workspace() {
                     {questionTab === "Overview" && (
                       <div>
                         {question.status === "needs_clarification" && (
-                          <div className="clarification-callout">
-                            <div
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 8,
-                                color: "#925700",
-                              }}
-                            >
-                              <Icon name="help" size={18} />
-                              <strong>
-                                Orchestrator clarification requested:
-                              </strong>
-                            </div>
-                            <p
-                              style={{
-                                margin: "8px 0",
-                                fontSize: 13,
-                                color: "#544321",
-                              }}
-                            >
-                              The question involves ambiguous metric dimensions
-                              or unspecified filters. Please provide additional
-                              clarification to guide execution.
-                            </p>
-                            <form
-                              className="clarification-form"
-                              onSubmit={(e) => {
-                                e.preventDefault();
-                                void handleClarification();
-                              }}
-                            >
-                              <input
-                                placeholder="E.g. Include tax discounts and restrict to calendar year 2024"
-                                value={clarificationText}
-                                onChange={(e) =>
-                                  setClarificationText(e.target.value)
-                                }
-                              />
-                              <button
-                                className="button button-dark"
-                                type="submit"
-                                disabled={submittingClarification}
-                              >
-                                {submittingClarification
-                                  ? "Submitting…"
-                                  : "Submit Clarification"}
-                              </button>
-                            </form>
-                          </div>
+                          <ClarificationPanel
+                            question={question}
+                            document={questionDocument}
+                            value={clarificationText}
+                            onChange={setClarificationText}
+                            onSubmit={() => void handleClarification()}
+                            busy={submittingClarification}
+                          />
                         )}
-
-                        {question.fileAnalysis && (
-                          <div className="info-callout">
-                            <Icon name="file" />
-                            <p>
-                              Source hash:{" "}
-                              {question.fileAnalysis.sourceHash.slice(0, 16)}… ·{" "}
-                              {question.fileAnalysis.method} ·{" "}
-                              {question.fileAnalysis.modelVersion}.{" "}
-                              {question.fileAnalysis.method === "extractive"
-                                ? "Verified source excerpts from the bounded document context."
-                                : "Values are computed from the complete stored file."}
-                            </p>
-                          </div>
-                        )}
-                        {question.result?.answer ? (
+                        {question.fileAnalysis ? (
+                          <FileAnswer
+                            analysis={question.fileAnalysis}
+                            document={questionDocument}
+                            onEvidence={() => setQuestionTab("Evidence")}
+                            onResults={() => setQuestionTab("Results")}
+                            onSchema={() => setQuestionTab("Schema")}
+                          />
+                        ) : question.status ===
+                          "needs_clarification" ? null : question.result
+                            ?.answer ? (
                           <div
                             className="claim-card"
                             style={{ margin: "16px 0", padding: 20 }}
@@ -1084,7 +1047,7 @@ export function Workspace() {
                             <p
                               style={{
                                 font: "18px/1.6 Georgia, serif",
-                                color: "#2d3e26",
+                                color: "#343942",
                                 margin: "10px 0",
                               }}
                             >
@@ -1114,7 +1077,7 @@ export function Workspace() {
 
                         {question.runId && !question.fileId && (
                           <div className="feedback-container">
-                            <span style={{ fontSize: 12, color: "#4f6345" }}>
+                            <span style={{ fontSize: 12, color: "#515762" }}>
                               Rate analysis accuracy:
                             </span>
                             <div style={{ display: "flex", gap: 6 }}>
@@ -1137,7 +1100,7 @@ export function Workspace() {
                               <span
                                 style={{
                                   fontSize: 11,
-                                  color: "#376d3a",
+                                  color: "#515762",
                                   marginLeft: "auto",
                                 }}
                               >
@@ -1150,121 +1113,25 @@ export function Workspace() {
                     )}
 
                     {questionTab === "Evidence" && question.fileAnalysis && (
-                      <section className="panel">
-                        <h2>Stored-file evidence</h2>
-                        <p className="muted">
-                          The original file is verified against its SHA-256 hash
-                          before analysis. Computations use all validated
-                          records; the table preview is bounded separately.
-                        </p>
-                        <dl className="file-evidence">
-                          <dt>Source hash</dt>
-                          <dd>{question.fileAnalysis.sourceHash}</dd>
-                          <dt>Method</dt>
-                          <dd>{question.fileAnalysis.method}</dd>
-                          <dt>Planner</dt>
-                          <dd>{question.fileAnalysis.modelVersion}</dd>
-                          <dt>Definition</dt>
-                          <dd>
-                            {question.fileAnalysis.result.answer.status ===
-                            "answered"
-                              ? question.fileAnalysis.result.answer.definition
-                              : question.fileAnalysis.result.answer.reason}
-                          </dd>
-                        </dl>
-                        {question.fileAnalysis.result.answer.assumptions.map(
-                          (assumption) => (
-                            <p className="fine-print" key={assumption}>
-                              {assumption}
-                            </p>
-                          ),
-                        )}
-                        {question.fileAnalysis.result.answer.limitations.map(
-                          (limitation) => (
-                            <p className="fine-print" key={limitation}>
-                              {limitation}
-                            </p>
-                          ),
-                        )}
-                      </section>
+                      <FileEvidence
+                        analysis={question.fileAnalysis}
+                        document={questionDocument}
+                      />
+                    )}
+                    {questionTab === "Schema" && question.fileId && (
+                      <FileSchema
+                        document={questionDocument}
+                        analysis={question.fileAnalysis}
+                        onAnalyze={askFileSchema}
+                      />
                     )}
                     {questionTab === "SQL" && (
                       <div>
                         {question.evidence?.finalStatus === "answered" &&
                         question.evidence.candidate.sqlText ? (
-                          <div className="sql-viewer-box">
-                            <div className="sql-actions-top">
-                              <span className="sql-ast-badge">
-                                <Icon name="shield" size={12} />
-                                AST read-only verified
-                              </span>
-                              <button
-                                className="button"
-                                style={{
-                                  background: "#334230",
-                                  borderColor: "#4a5d46",
-                                  color: "#f0f6ec",
-                                  padding: "3px 8px",
-                                  fontSize: 11,
-                                }}
-                                onClick={() =>
-                                  handleCopySql(
-                                    question.evidence?.finalStatus ===
-                                      "answered"
-                                      ? question.evidence.candidate.sqlText
-                                      : "",
-                                  )
-                                }
-                              >
-                                <Icon
-                                  name={copiedSql ? "check" : "copy"}
-                                  size={13}
-                                />
-                                {copiedSql ? "Copied" : "Copy SQL"}
-                              </button>
-                            </div>
-                            <pre style={{ margin: 0 }}>
-                              <code>{question.evidence.candidate.sqlText}</code>
-                            </pre>
-                          </div>
-                        ) : question.result?.answer.status === "answered" &&
-                          question.result.answer.sqlReference ? (
-                          <div className="sql-viewer-box">
-                            <div className="sql-actions-top">
-                              <span className="sql-ast-badge">
-                                <Icon name="shield" size={12} />
-                                AST read-only verified
-                              </span>
-                              <button
-                                className="button"
-                                style={{
-                                  background: "#334230",
-                                  borderColor: "#4a5d46",
-                                  color: "#f0f6ec",
-                                  padding: "3px 8px",
-                                  fontSize: 11,
-                                }}
-                                onClick={() =>
-                                  handleCopySql(
-                                    question.result?.answer.status ===
-                                      "answered"
-                                      ? (question.result.answer.sqlReference ??
-                                          "")
-                                      : "",
-                                  )
-                                }
-                              >
-                                <Icon
-                                  name={copiedSql ? "check" : "copy"}
-                                  size={13}
-                                />
-                                {copiedSql ? "Copied" : "Copy SQL"}
-                              </button>
-                            </div>
-                            <pre style={{ margin: 0 }}>
-                              <code>{question.result.answer.sqlReference}</code>
-                            </pre>
-                          </div>
+                          <CodeBlock
+                            code={question.evidence.candidate.sqlText}
+                          />
                         ) : (
                           <EmptyState icon="code" title="No SQL generated yet">
                             SQL generation occurs upon execution against an

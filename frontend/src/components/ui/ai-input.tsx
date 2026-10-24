@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef } from "react";
+import { PromptEditor } from "./prompt-editor";
 import { Icon, type IconName } from "../icon";
 
 const modes: { label: string; icon: IconName }[] = [
@@ -56,32 +57,18 @@ export function AIInput({
         }}
       >
         <div className="prompt-text">
-          <span className="prompt-symbol">
-            <Icon name="sparkles" size={21} />
-          </span>
-          <textarea
-            ref={input}
-            aria-label="Your analysis question"
-            maxLength={4000}
+          <PromptEditor
+            inputRef={input}
             value={value}
-            onChange={(event) => onChange(event.target.value)}
+            onChange={onChange}
+            onSubmit={onSubmit}
             placeholder={
               mode === "Verify a claim"
                 ? "What would you like to double-check?"
                 : mode === "Explore schema"
-                  ? "What would you like to understand about your data?"
-                  : "Ask anything about your data…"
+                  ? "Which fields would you like to explore?"
+                  : "Ask a question about your data…"
             }
-            onKeyDown={(event) => {
-              if (
-                event.key === "Enter" &&
-                !event.shiftKey &&
-                !event.nativeEvent.isComposing
-              ) {
-                event.preventDefault();
-                onSubmit();
-              }
-            }}
           />
         </div>
         <div className="prompt-toolbar">
@@ -105,11 +92,14 @@ export function AIInput({
             </button>
           </div>
           <div className="prompt-tools">
+            <span className="input-shortcut" aria-hidden="true">
+              ↵ Ask <span>⇧↵ New line</span>
+            </span>
             <span
               className="local-model"
               title="Local Qwen2.5-Coder plans supported file questions; values are calculated from stored records."
             >
-              <span className="model-mark">✳</span> Qwen 2.5{" "}
+              <span className="model-indicator" /> Qwen 2.5{" "}
               <span className="model-local">Local</span>
             </span>
             <button
@@ -118,7 +108,7 @@ export function AIInput({
               disabled={!value.trim()}
               aria-label="Submit question"
             >
-              <Icon name="up" size={20} />
+              <Icon name="up" size={17} />
             </button>
           </div>
         </div>

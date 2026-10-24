@@ -75,7 +75,7 @@ export function HomeView({
             className={`status-dot ${documents.length ? "connected" : ""}`}
           />
           {documents.length
-            ? `${documents.length} local ${documents.length === 1 ? "source" : "sources"}`
+            ? `${documents.length} stored ${documents.length === 1 ? "source" : "sources"}`
             : "Ready for your first source"}
           <Icon name="down" size={12} />
         </button>
@@ -83,13 +83,7 @@ export function HomeView({
       {!overview ? (
         <div className="home-inner">
           <div className="hero">
-            <span className="hero-emblem">
-              <Icon name="sparkles" size={32} />
-              <span className="emblem-star">✦</span>
-            </span>
-            <span className="eyebrow">
-              A LITTLE CURIOSITY. A LOT OF CLARITY.
-            </span>
+            <span className="eyebrow">YOUR DATA, A LITTLE CLEARER</span>
             <h1>What will you discover today?</h1>
             <p>Your questions. Your data. Answers you can trace.</p>
           </div>
@@ -113,7 +107,7 @@ export function HomeView({
                 }
               >
                 <span className={`tile-icon ${template.color}`}>
-                  <Icon name={template.icon} size={21} />
+                  <Icon name={template.icon} size={17} />
                 </span>
                 <strong>{template.title}</strong>
                 <p>{template.description}</p>
@@ -157,31 +151,28 @@ export function HomeView({
                     above.
                   </p>
                 </div>
-                <span className="tiny-star" aria-hidden="true">
-                  ✧
-                </span>
               </div>
             )}
           </section>
           <div className="home-footer">
             <span className="footer-wordmark">
-              <Icon name="sparkles" size={13} /> Thoughtful analysis, by Metis.
+              Thoughtful analysis, by Metis.
             </span>
             <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
               <Link
                 href="/privacy"
-                style={{ color: "#6c765e", textDecoration: "none" }}
+                style={{ color: "#6b707a", textDecoration: "none" }}
               >
                 Privacy Policy
               </Link>
-              <span style={{ color: "#c1c8ba" }}>·</span>
+              <span style={{ color: "#d0d3da" }}>·</span>
               <Link
                 href="/terms"
-                style={{ color: "#6c765e", textDecoration: "none" }}
+                style={{ color: "#6b707a", textDecoration: "none" }}
               >
                 Terms of Service
               </Link>
-              <span style={{ color: "#c1c8ba" }}>·</span>
+              <span style={{ color: "#d0d3da" }}>·</span>
               <button onClick={() => navigate("Help & getting started")}>
                 A quick tour
                 <Icon name="arrow" size={13} />
@@ -210,7 +201,7 @@ export function HomeView({
                 icon: "database",
               },
               {
-                label: "Question drafts",
+                label: "Analyses",
                 value: questions.length,
                 icon: "chat",
               },
@@ -234,6 +225,79 @@ export function HomeView({
                 <span>{stat.label}</span>
               </div>
             ))}
+          </div>
+          <div className="overview-insights">
+            <section className="panel activity-summary">
+              <div className="section-heading">
+                <h2>Answer activity</h2>
+                <span className="muted">Recent history</span>
+              </div>
+              <p className="muted">A clear view of your workspace questions.</p>
+              {[
+                {
+                  label: "Answered",
+                  count: questions.filter((item) => item.status === "answered")
+                    .length,
+                },
+                {
+                  label: "Needs attention",
+                  count: questions.filter((item) =>
+                    [
+                      "needs_clarification",
+                      "abstained",
+                      "execution_failed",
+                      "blocked_by_policy",
+                    ].includes(item.status ?? ""),
+                  ).length,
+                },
+                {
+                  label: "Drafts & in progress",
+                  count: questions.filter(
+                    (item) =>
+                      !item.status ||
+                      ["planning", "executing", "queued"].includes(item.status),
+                  ).length,
+                },
+              ].map((item) => (
+                <div className="activity-summary-row" key={item.label}>
+                  <span>{item.label}</span>
+                  <strong>{item.count}</strong>
+                  <progress
+                    max={Math.max(1, questions.length)}
+                    value={item.count}
+                    aria-label={item.label}
+                  />
+                </div>
+              ))}
+              {!questions.length && (
+                <p className="fine-print">
+                  Activity appears after your first question.
+                </p>
+              )}
+            </section>
+            <section className="panel overview-recent">
+              <div className="section-heading">
+                <h2>Recent questions</h2>
+                <button
+                  className="text-button"
+                  onClick={() => navigate("All analyses")}
+                >
+                  View all <Icon name="arrow" size={13} />
+                </button>
+              </div>
+              {questions.length ? (
+                <QuestionList
+                  questions={questions.slice(0, 3)}
+                  onOpen={openQuestion}
+                  onSave={toggleSaved}
+                  onRemove={removeQuestion}
+                />
+              ) : (
+                <p className="muted">
+                  Your saved question history will appear here.
+                </p>
+              )}
+            </section>
           </div>
           <section className="panel">
             <div className="section-heading">
