@@ -12,10 +12,17 @@ describe("GET /health", () => {
     await app.close();
   });
 
-  it("returns ok", async () => {
-    const response = await app.inject({ method: "GET", url: "/health" });
+  it("returns ok for /health, /health/live, and /health/ready", async () => {
+    const health = await app.inject({ method: "GET", url: "/health" });
+    expect(health.statusCode).toBe(200);
+    expect(health.json()).toEqual({ status: "ok" });
 
-    expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({ status: "ok" });
+    const live = await app.inject({ method: "GET", url: "/health/live" });
+    expect(live.statusCode).toBe(200);
+    expect(live.json()).toEqual({ status: "ok" });
+
+    const ready = await app.inject({ method: "GET", url: "/health/ready" });
+    expect(ready.statusCode).toBe(200);
+    expect(ready.json()).toEqual({ status: "ok" });
   });
 });
