@@ -24,6 +24,12 @@ export type PolicySimulateResult =
   components["schemas"]["PolicySimulateResult"];
 export type ConversationContextResponse =
   components["schemas"]["ConversationContextResponse"];
+export type SchemaDriftDiff = components["schemas"]["SchemaDriftDiff"];
+export type SchemaMapping = components["schemas"]["SchemaMapping"];
+export type SchemaMappingRequest =
+  components["schemas"]["SchemaMappingRequest"];
+export type ImpactPreviewResponse =
+  components["schemas"]["ImpactPreviewResponse"];
 
 function resolveUrl(path: string, baseUrl?: string): string {
   if (baseUrl) {
@@ -268,4 +274,46 @@ export function getExportUrl(
   format: "csv" | "sql" | "reproducibility",
 ): string {
   return `/api/backend/v1/runs/${runId}/export/${format}`;
+}
+
+export async function getConnectionDrift(
+  connectionId: string,
+): Promise<SchemaDriftDiff> {
+  return fetchJson<SchemaDriftDiff>(`/v1/connections/${connectionId}/drift`);
+}
+
+export async function getImpactPreview(
+  connectionId: string,
+): Promise<ImpactPreviewResponse> {
+  return fetchJson<ImpactPreviewResponse>(
+    `/v1/connections/${connectionId}/impact-preview`,
+  );
+}
+
+export async function getConnectionMappings(
+  connectionId: string,
+): Promise<SchemaMapping[]> {
+  return fetchJson<SchemaMapping[]>(`/v1/connections/${connectionId}/mappings`);
+}
+
+export async function createSchemaMapping(
+  connectionId: string,
+  input: SchemaMappingRequest,
+): Promise<SchemaMapping> {
+  return fetchJson<SchemaMapping>(`/v1/connections/${connectionId}/mappings`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function approveSchemaMapping(
+  connectionId: string,
+  mappingId: string,
+): Promise<SchemaMapping> {
+  return fetchJson<SchemaMapping>(
+    `/v1/connections/${connectionId}/mappings/${mappingId}/approve`,
+    {
+      method: "POST",
+    },
+  );
 }

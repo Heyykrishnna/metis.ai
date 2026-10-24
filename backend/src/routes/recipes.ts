@@ -16,6 +16,25 @@ import { getMemoryConnection } from "./connections.js";
 
 const memoryRecipes = new Map<string, Recipe>();
 
+export function getRecipesForConnection(connectionId: string): Recipe[] {
+  const result: Recipe[] = [];
+  for (const recipe of memoryRecipes.values()) {
+    if (recipe.connectionId === connectionId) {
+      result.push(recipe);
+    }
+  }
+  return result;
+}
+
+export function invalidateRecipeDueToDrift(recipeId: string): boolean {
+  const recipe = memoryRecipes.get(recipeId);
+  if (recipe) {
+    recipe.approvalStatus = "draft";
+    return true;
+  }
+  return false;
+}
+
 const recipeParamsSchema = Type.Object(
   {
     recipeId: IdSchema,

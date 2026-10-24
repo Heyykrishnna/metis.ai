@@ -24,6 +24,8 @@ import {
   recordConversationTurn,
   resolveConversationalFollowUp,
 } from "./conversations.js";
+import { detectSchemaDrift, recoverEvolvedSql } from "./drift.js";
+import type { SchemaDriftDiff } from "../contracts/drift.js";
 import { canTransition } from "../contracts/lifecycle.js";
 import type { MetadataDatabase } from "../db/index.js";
 import {
@@ -157,11 +159,20 @@ export class AnalysisOrchestrator {
   private readonly metadataDb: MetadataDatabase | null;
   private readonly emitter = new EventEmitter();
   private readonly activeRuns = new Map<string, StoredRunState>();
+  private readonly baselineSchemas = new Map<string, DiscoveredSchema>();
 
   constructor(deps: OrchestratorDeps) {
     this.adapter = deps.adapter;
     this.inference = deps.inference;
     this.metadataDb = deps.metadataDb ?? null;
+  }
+
+  setBaselineSchema(connectionId: string, schema: DiscoveredSchema): void {
+    this.baselineSchemas.set(connectionId, schema);
+  }
+
+  getBaselineSchema(connectionId: string): DiscoveredSchema | undefined {
+    return this.baselineSchemas.get(connectionId);
   }
 
   getAdapter(): ConnectorAdapter {
@@ -213,9 +224,9 @@ export class AnalysisOrchestrator {
         .where(
           workspaceId
             ? and(
-                eq(analysisRuns.id, runId),
-                eq(analysisRuns.workspaceId, workspaceId),
-              )
+              eq(analysisRuns.id, runId),
+              eq(analysisRuns.workspaceId, workspaceId),
+            )
             : eq(analysisRuns.id, runId),
         );
       const row = rows[0];
@@ -283,9 +294,9 @@ export class AnalysisOrchestrator {
     const candidate =
       state.run.status === "blocked_by_policy" && state.candidate
         ? {
-            ...state.candidate,
-            sqlText: "[REDACTED BLOCKED QUERY]",
-          }
+          ...state.candidate,
+          sqlText: "[REDACTED BLOCKED QUERY]",
+        }
         : state.candidate;
 
     return {
@@ -676,16 +687,16 @@ export class AnalysisOrchestrator {
         parentRunId: input.parentRunId ?? null,
         parentState: parentState
           ? {
-              runId: parentState.run.runId,
-              workspaceId: parentState.workspaceId,
-              connectionId: parentState.connectionId,
-              question: parentState.question,
-              status: parentState.run.status,
-              intent: parentState.intent,
-              plan: parentState.plan,
-              activeContext: parentState.activeContext,
-              assumptions: parentState.assumptions,
-            }
+            runId: parentState.run.runId,
+            workspaceId: parentState.workspaceId,
+            connectionId: parentState.connectionId,
+            question: parentState.question,
+            status: parentState.run.status,
+            intent: parentState.intent,
+            plan: parentState.plan,
+            activeContext: parentState.activeContext,
+            assumptions: parentState.assumptions,
+          }
           : null,
         currentWorkspaceId: input.workspaceId,
         connectionId: input.connectionId,
@@ -767,6 +778,19 @@ export class AnalysisOrchestrator {
         discovered = { tables: [] };
       }
 
+      const baseline = this.baselineSchemas.get(input.connectionId);
+      let driftDiff: SchemaDriftDiff | null = null;
+      if (baseline) {
+        driftDiff = detectSchemaDrift(
+          input.connectionId,
+          baseline,
+          discovered,
+          input.allowedSchemas,
+        );
+      } else {
+        this.baselineSchemas.set(input.connectionId, discovered);
+      }
+
       const snapshotId = randomUUID();
       const schemaHash = calculateSchemaHash(discovered);
       state.snapshotId = snapshotId;
@@ -776,7 +800,7 @@ export class AnalysisOrchestrator {
           const now = new Date();
           const expiresAt = new Date(
             now.getTime() +
-              foundationPolicy.retention.schemaSnapshotDays * 86400000,
+            foundationPolicy.retention.schemaSnapshotDays * 86400000,
           );
           await this.metadataDb
             .insert(schemaSnapshots)
@@ -810,7 +834,84 @@ export class AnalysisOrchestrator {
       if (checkAbort()) return state.run;
 
       const candidateId = randomUUID();
-      const generatedSql = input.sqlOverride ?? resolution.sqlText;
+      let generatedSql = input.sqlOverride ?? resolution.sqlText;
+      const role = input.role ?? "owner";
+
+      if (driftDiff && driftDiff.hasDrift) {
+        const recovery = recoverEvolvedSql({
+          connectionId: input.connectionId,
+          sql: generatedSql,
+          drift: driftDiff,
+          role,
+        });
+
+        if (recovery.status === "blocked_by_policy") {
+          this.emitProgress(state, "blocked_by_policy");
+          state.run.completedAt = new Date().toISOString();
+          state.answer = {
+            runId,
+            status: "blocked_by_policy",
+            reason:
+              recovery.reason ??
+              "Query rejected by organization policy: Access to required evolved table or schema is denied by policy",
+            nextAction:
+              recovery.nextAction ??
+              "Request authorization from workspace owner",
+            assumptions: state.assumptions,
+            limitations: [],
+          };
+          await this.persistRun(state);
+          return state.run;
+        }
+
+        if (recovery.status === "needs_clarification") {
+          this.emitProgress(state, "needs_clarification");
+          state.run.completedAt = new Date().toISOString();
+          state.answer = {
+            runId,
+            status: "needs_clarification",
+            reason:
+              recovery.reason ??
+              "Multiple plausible evolved table candidates detected without an approved mapping",
+            nextAction:
+              recovery.nextAction ??
+              "Clarify target entity or approve schema evolution mapping",
+            assumptions: state.assumptions,
+            limitations: [],
+          };
+          await this.persistRun(state);
+          return state.run;
+        }
+
+        if (recovery.status === "abstained") {
+          this.emitProgress(state, "abstained");
+          state.run.completedAt = new Date().toISOString();
+          state.answer = {
+            runId,
+            status: "abstained",
+            reason:
+              recovery.reason ??
+              "Required analytical table has been dropped without replacement mapping",
+            nextAction:
+              recovery.nextAction ??
+              "Verify database availability of target analytical table",
+            assumptions: state.assumptions,
+            limitations: [],
+          };
+          await this.persistRun(state);
+          return state.run;
+        }
+
+        if (recovery.status === "recovered") {
+          generatedSql = recovery.recoveredSql;
+          state.assumptions.push(
+            "Recovered from schema drift using approved mapping",
+          );
+          if (recovery.referencedObjects.length > 0) {
+            resolution.activeContext.sources = recovery.referencedObjects;
+          }
+        }
+      }
 
       state.candidate = {
         candidateId,
@@ -840,7 +941,6 @@ export class AnalysisOrchestrator {
         return state.run;
       }
 
-      const role = input.role ?? "owner";
       const policyEval = evaluatePolicyCompliance(generatedSql, role, {
         isRecipe: input.isRecipe,
         assignedRegion: input.assignedRegion ?? "North America",
@@ -897,18 +997,80 @@ export class AnalysisOrchestrator {
         });
       } catch (err) {
         if (checkAbort()) return state.run;
-        this.emitProgress(state, "execution_failed");
-        state.run.completedAt = new Date().toISOString();
-        state.answer = {
-          runId,
-          status: "execution_failed",
-          reason: `SQL execution failed: ${err instanceof Error ? err.message : "database error"}`,
-          nextAction: "Check query syntax and constraints",
-          assumptions: state.assumptions,
-          limitations: [],
-        };
-        await this.persistRun(state);
-        return state.run;
+
+        const errMessage = err instanceof Error ? err.message : "";
+        const isStaleObjectError =
+          errMessage.includes("does not exist") ||
+          errMessage.includes("undefined_table") ||
+          errMessage.includes("undefined_column");
+
+        if (isStaleObjectError && !driftDiff?.hasDrift) {
+          try {
+            const freshSchema = await discoverSchema(
+              this.adapter,
+              input.allowedSchemas,
+            );
+            const freshDiff = detectSchemaDrift(
+              input.connectionId,
+              discovered,
+              freshSchema,
+              input.allowedSchemas,
+            );
+            if (freshDiff.hasDrift) {
+              const retryRecovery = recoverEvolvedSql({
+                connectionId: input.connectionId,
+                sql: generatedSql,
+                drift: freshDiff,
+                role,
+              });
+              if (retryRecovery.status === "recovered") {
+                const retryPolicy = evaluatePolicyCompliance(
+                  retryRecovery.recoveredSql,
+                  role,
+                  {
+                    isRecipe: input.isRecipe,
+                    assignedRegion: input.assignedRegion ?? "North America",
+                  },
+                );
+                if (retryPolicy.allowed) {
+                  generatedSql = retryRecovery.recoveredSql;
+                  state.candidate.sqlText = generatedSql;
+                  state.assumptions.push(
+                    "Recovered from schema drift using approved mapping on execution retry",
+                  );
+                  queryResult = await this.adapter.query({
+                    sql: generatedSql,
+                    signal: abortController.signal,
+                    timeoutMs: foundationPolicy.limits.queryTimeoutMs,
+                    context: {
+                      role,
+                      workspaceId: input.workspaceId,
+                      subject: input.actorSubject,
+                      region: input.assignedRegion ?? "North America",
+                    },
+                  });
+                }
+              }
+            }
+          } catch {
+            // Fall through to error
+          }
+        }
+
+        if (!queryResult) {
+          this.emitProgress(state, "execution_failed");
+          state.run.completedAt = new Date().toISOString();
+          state.answer = {
+            runId,
+            status: "execution_failed",
+            reason: `SQL execution failed: ${errMessage || "database error"}`,
+            nextAction: "Check query syntax and constraints",
+            assumptions: state.assumptions,
+            limitations: [],
+          };
+          await this.persistRun(state);
+          return state.run;
+        }
       }
 
       if (input.actorSubject && isSubjectRevoked(input.actorSubject)) {

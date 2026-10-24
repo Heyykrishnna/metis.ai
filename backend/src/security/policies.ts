@@ -150,6 +150,15 @@ function extractBinaryOperand(val: unknown): string {
     if (obj.type === "column_ref") {
       return extractColumnName(obj.column) ?? "";
     }
+    if (obj.type === "expr_list" && Array.isArray(obj.value)) {
+      return obj.value
+        .map((v) =>
+          v && typeof v === "object" && "value" in v
+            ? String((v as Record<string, unknown>).value)
+            : String(v),
+        )
+        .join(",");
+    }
     if (obj.value !== undefined) {
       return String(obj.value);
     }
@@ -334,12 +343,15 @@ export function evaluatePolicyCompliance(
     if (expr.isColumnComparison) {
       continue;
     }
-    if (
+    const isEntityKey =
       expr.left === "school_id" ||
       expr.left === "student_id" ||
       expr.left === "employee_id" ||
-      expr.left === "id"
-    ) {
+      expr.left === "id" ||
+      expr.left === "k" ||
+      expr.left === "org_k";
+
+    if (isEntityKey) {
       if (expr.op === "!=" || expr.op === "<>") {
         hasSmallCohortRisk = true;
         violations.push(
@@ -347,14 +359,18 @@ export function evaluatePolicyCompliance(
         );
       }
       if (
-        expr.op === "=" &&
+        (expr.op === "=" || expr.op === "IN") &&
         state.aggregates.size > 0 &&
         (role === "analyst" || role === "viewer")
       ) {
-        hasSmallCohortRisk = true;
-        violations.push(
-          `Small-cohort aggregate below privacy threshold (cohort < ${SMALL_COHORT_THRESHOLD})`,
-        );
+        const cohortSize =
+          expr.op === "IN" ? String(expr.right).split(",").length : 1;
+        if (cohortSize < SMALL_COHORT_THRESHOLD) {
+          hasSmallCohortRisk = true;
+          violations.push(
+            `Small-cohort aggregate below privacy threshold (cohort < ${SMALL_COHORT_THRESHOLD})`,
+          );
+        }
       }
     }
   }

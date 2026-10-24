@@ -561,6 +561,482 @@
         }
       }
     },
+    "/v1/connections/{connectionId}/drift": {
+      "parameters": [
+        {
+          "name": "connectionId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "getConnectionDrift",
+        "x-implementation-status": "planned",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SchemaDriftDiff"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Resource limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/connections/{connectionId}/impact-preview": {
+      "parameters": [
+        {
+          "name": "connectionId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "getImpactPreview",
+        "x-implementation-status": "planned",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImpactPreviewResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Resource limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/connections/{connectionId}/mappings": {
+      "parameters": [
+        {
+          "name": "connectionId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "listConnectionMappings",
+        "x-implementation-status": "planned",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SchemaMappings"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Resource limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createSchemaMapping",
+        "x-implementation-status": "planned",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SchemaMappingRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SchemaMapping"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Resource limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/connections/{connectionId}/mappings/{mappingId}/approve": {
+      "parameters": [
+        {
+          "name": "connectionId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          }
+        },
+        {
+          "name": "mappingId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          }
+        }
+      ],
+      "post": {
+        "operationId": "approveSchemaMapping",
+        "x-implementation-status": "planned",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SchemaMapping"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Resource limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/analyses": {
       "post": {
         "operationId": "submitAnalysis",
@@ -8032,6 +8508,743 @@
               "additionalProperties": false
             },
             "maxItems": 100
+          }
+        },
+        "additionalProperties": false
+      },
+      "SchemaDriftDiff": {
+        "type": "object",
+        "required": [
+          "connectionId",
+          "previousSchemaHash",
+          "currentSchemaHash",
+          "hasDrift",
+          "changes",
+          "detectedAt"
+        ],
+        "properties": {
+          "connectionId": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "previousSchemaHash": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "currentSchemaHash": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "hasDrift": {
+            "type": "boolean"
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "category",
+                "severity",
+                "sourceObject",
+                "targetObjects",
+                "affectedColumns",
+                "explanation"
+              ],
+              "properties": {
+                "category": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "const": "renamed_table"
+                    },
+                    {
+                      "type": "string",
+                      "const": "renamed_column"
+                    },
+                    {
+                      "type": "string",
+                      "const": "split_vertical"
+                    },
+                    {
+                      "type": "string",
+                      "const": "split_horizontal"
+                    },
+                    {
+                      "type": "string",
+                      "const": "dropped_object"
+                    },
+                    {
+                      "type": "string",
+                      "const": "permission_loss"
+                    },
+                    {
+                      "type": "string",
+                      "const": "type_changed"
+                    }
+                  ]
+                },
+                "severity": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "const": "info"
+                    },
+                    {
+                      "type": "string",
+                      "const": "warning"
+                    },
+                    {
+                      "type": "string",
+                      "const": "breaking"
+                    }
+                  ]
+                },
+                "sourceObject": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                "targetObjects": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4096
+                  },
+                  "maxItems": 10
+                },
+                "affectedColumns": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4096
+                  },
+                  "maxItems": 50
+                },
+                "explanation": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                }
+              },
+              "additionalProperties": false
+            },
+            "maxItems": 50
+          },
+          "detectedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SchemaMappingRequest": {
+        "type": "object",
+        "required": [
+          "sourceTable",
+          "targetTables",
+          "mappingType",
+          "columnRules"
+        ],
+        "properties": {
+          "sourceTable": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "targetTables": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            "minItems": 1,
+            "maxItems": 10
+          },
+          "mappingType": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "rename"
+              },
+              {
+                "type": "string",
+                "const": "split_vertical"
+              },
+              {
+                "type": "string",
+                "const": "split_horizontal"
+              }
+            ]
+          },
+          "joinKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "partitionColumn": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "columnRules": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "sourceColumn",
+                "targetTable",
+                "targetColumn"
+              ],
+              "properties": {
+                "sourceColumn": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                "targetTable": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                "targetColumn": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                "transformation": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                }
+              },
+              "additionalProperties": false
+            },
+            "maxItems": 100
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "proposed"
+              },
+              {
+                "type": "string",
+                "const": "approved"
+              },
+              {
+                "type": "string",
+                "const": "rejected"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "SchemaMapping": {
+        "type": "object",
+        "required": [
+          "id",
+          "connectionId",
+          "sourceTable",
+          "targetTables",
+          "mappingType",
+          "columnRules",
+          "status",
+          "createdAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "connectionId": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "sourceTable": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "targetTables": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            "minItems": 1,
+            "maxItems": 10
+          },
+          "mappingType": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "rename"
+              },
+              {
+                "type": "string",
+                "const": "split_vertical"
+              },
+              {
+                "type": "string",
+                "const": "split_horizontal"
+              }
+            ]
+          },
+          "joinKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "partitionColumn": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "columnRules": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "sourceColumn",
+                "targetTable",
+                "targetColumn"
+              ],
+              "properties": {
+                "sourceColumn": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                "targetTable": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                "targetColumn": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                "transformation": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                }
+              },
+              "additionalProperties": false
+            },
+            "maxItems": 100
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "proposed"
+              },
+              {
+                "type": "string",
+                "const": "approved"
+              },
+              {
+                "type": "string",
+                "const": "rejected"
+              }
+            ]
+          },
+          "reviewedBy": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "reviewedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SchemaMappings": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": [
+            "id",
+            "connectionId",
+            "sourceTable",
+            "targetTables",
+            "mappingType",
+            "columnRules",
+            "status",
+            "createdAt"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            },
+            "connectionId": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            },
+            "sourceTable": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            "targetTables": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4096
+              },
+              "minItems": 1,
+              "maxItems": 10
+            },
+            "mappingType": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "const": "rename"
+                },
+                {
+                  "type": "string",
+                  "const": "split_vertical"
+                },
+                {
+                  "type": "string",
+                  "const": "split_horizontal"
+                }
+              ]
+            },
+            "joinKey": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            "partitionColumn": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            "columnRules": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "sourceColumn",
+                  "targetTable",
+                  "targetColumn"
+                ],
+                "properties": {
+                  "sourceColumn": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4096
+                  },
+                  "targetTable": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4096
+                  },
+                  "targetColumn": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4096
+                  },
+                  "transformation": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4096
+                  }
+                },
+                "additionalProperties": false
+              },
+              "maxItems": 100
+            },
+            "status": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "const": "proposed"
+                },
+                {
+                  "type": "string",
+                  "const": "approved"
+                },
+                {
+                  "type": "string",
+                  "const": "rejected"
+                }
+              ]
+            },
+            "reviewedBy": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            "reviewedAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "createdAt": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          "additionalProperties": false
+        },
+        "maxItems": 100
+      },
+      "ImpactPreviewResponse": {
+        "type": "object",
+        "required": [
+          "connectionId",
+          "drift",
+          "affectedRecipes",
+          "affectedContexts",
+          "recommendedActions"
+        ],
+        "properties": {
+          "connectionId": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "drift": {
+            "type": "object",
+            "required": [
+              "connectionId",
+              "previousSchemaHash",
+              "currentSchemaHash",
+              "hasDrift",
+              "changes",
+              "detectedAt"
+            ],
+            "properties": {
+              "connectionId": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+              },
+              "previousSchemaHash": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4096
+              },
+              "currentSchemaHash": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4096
+              },
+              "hasDrift": {
+                "type": "boolean"
+              },
+              "changes": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "category",
+                    "severity",
+                    "sourceObject",
+                    "targetObjects",
+                    "affectedColumns",
+                    "explanation"
+                  ],
+                  "properties": {
+                    "category": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "const": "renamed_table"
+                        },
+                        {
+                          "type": "string",
+                          "const": "renamed_column"
+                        },
+                        {
+                          "type": "string",
+                          "const": "split_vertical"
+                        },
+                        {
+                          "type": "string",
+                          "const": "split_horizontal"
+                        },
+                        {
+                          "type": "string",
+                          "const": "dropped_object"
+                        },
+                        {
+                          "type": "string",
+                          "const": "permission_loss"
+                        },
+                        {
+                          "type": "string",
+                          "const": "type_changed"
+                        }
+                      ]
+                    },
+                    "severity": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "const": "info"
+                        },
+                        {
+                          "type": "string",
+                          "const": "warning"
+                        },
+                        {
+                          "type": "string",
+                          "const": "breaking"
+                        }
+                      ]
+                    },
+                    "sourceObject": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 4096
+                    },
+                    "targetObjects": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 4096
+                      },
+                      "maxItems": 10
+                    },
+                    "affectedColumns": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 4096
+                      },
+                      "maxItems": 50
+                    },
+                    "explanation": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 4096
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "maxItems": 50
+              },
+              "detectedAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "additionalProperties": false
+          },
+          "affectedRecipes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "recipeId",
+                "name",
+                "status",
+                "staleObjects"
+              ],
+              "properties": {
+                "recipeId": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                "status": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "const": "valid"
+                    },
+                    {
+                      "type": "string",
+                      "const": "needs_update"
+                    },
+                    {
+                      "type": "string",
+                      "const": "invalidated"
+                    }
+                  ]
+                },
+                "staleObjects": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4096
+                  },
+                  "maxItems": 20
+                },
+                "proposedUpdate": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                }
+              },
+              "additionalProperties": false
+            },
+            "maxItems": 100
+          },
+          "affectedContexts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "runId",
+                "turnNumber",
+                "staleSources"
+              ],
+              "properties": {
+                "runId": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                },
+                "turnNumber": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "staleSources": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4096
+                  },
+                  "maxItems": 20
+                }
+              },
+              "additionalProperties": false
+            },
+            "maxItems": 100
+          },
+          "recommendedActions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            "maxItems": 50
           }
         },
         "additionalProperties": false

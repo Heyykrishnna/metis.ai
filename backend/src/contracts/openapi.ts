@@ -37,6 +37,12 @@ import {
   PolicySimulateInputSchema,
   PolicySimulateResultSchema,
 } from "./policy.js";
+import {
+  ImpactPreviewResponseSchema,
+  SchemaDriftDiffSchema,
+  SchemaMappingRequestSchema,
+  SchemaMappingSchema,
+} from "./drift.js";
 
 const apiSchemas = {
   QuestionIntent: QuestionIntentSchema,
@@ -76,6 +82,11 @@ const apiSchemas = {
   PolicySimulateInput: PolicySimulateInputSchema,
   PolicySimulateResult: PolicySimulateResultSchema,
   ConversationContextResponse: ConversationContextResponseSchema,
+  SchemaDriftDiff: SchemaDriftDiffSchema,
+  SchemaMappingRequest: SchemaMappingRequestSchema,
+  SchemaMapping: SchemaMappingSchema,
+  SchemaMappings: Type.Array(SchemaMappingSchema, { maxItems: 100 }),
+  ImpactPreviewResponse: ImpactPreviewResponseSchema,
 };
 function ref(name: keyof typeof apiSchemas) {
   return Type.Ref(`#/components/schemas/${name}`);
@@ -163,6 +174,37 @@ export const openApiDocument = {
         { name: "connectionId", in: "path", required: true, schema: IdSchema },
       ],
       get: operation("getSchemaConstellation", ref("SchemaConstellation")),
+    },
+    "/v1/connections/{connectionId}/drift": {
+      parameters: [
+        { name: "connectionId", in: "path", required: true, schema: IdSchema },
+      ],
+      get: operation("getConnectionDrift", ref("SchemaDriftDiff")),
+    },
+    "/v1/connections/{connectionId}/impact-preview": {
+      parameters: [
+        { name: "connectionId", in: "path", required: true, schema: IdSchema },
+      ],
+      get: operation("getImpactPreview", ref("ImpactPreviewResponse")),
+    },
+    "/v1/connections/{connectionId}/mappings": {
+      parameters: [
+        { name: "connectionId", in: "path", required: true, schema: IdSchema },
+      ],
+      get: operation("listConnectionMappings", ref("SchemaMappings")),
+      post: operation(
+        "createSchemaMapping",
+        ref("SchemaMapping"),
+        ref("SchemaMappingRequest"),
+        "201",
+      ),
+    },
+    "/v1/connections/{connectionId}/mappings/{mappingId}/approve": {
+      parameters: [
+        { name: "connectionId", in: "path", required: true, schema: IdSchema },
+        { name: "mappingId", in: "path", required: true, schema: IdSchema },
+      ],
+      post: operation("approveSchemaMapping", ref("SchemaMapping")),
     },
     "/v1/analyses": {
       post: operation(
