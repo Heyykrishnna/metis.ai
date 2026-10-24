@@ -1,14 +1,18 @@
-import { drizzle, type PostgresJsDatabase } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
+import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
+import { logger } from "../logger.js";
+import { metadataPoolConfig } from "./config.js";
 import * as schema from "./schema.js";
 
-export type MetadataDatabase = PostgresJsDatabase<typeof schema>;
+export type MetadataDatabase = NodePgDatabase<typeof schema>;
 
 export function createMetadataDb(databaseUrl: string): {
   db: MetadataDatabase;
-  client: ReturnType<typeof postgres>;
+  pool: Pool;
 } {
-  const client = postgres(databaseUrl);
-  const db = drizzle(client, { schema });
-  return { db, client };
+  const pool = new Pool(metadataPoolConfig(databaseUrl));
+  pool.on("error", (error) =>
+    logger.error({ err: error }, "Metadata connection failed"),
+  );
+  return { db: drizzle(pool, { schema }), pool };
 }

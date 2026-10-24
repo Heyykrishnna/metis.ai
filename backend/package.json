@@ -14,7 +14,7 @@
     "test": "vitest",
     "test:run": "vitest run",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
+    "db:migrate": "node --import tsx scripts/database.ts migrate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "lint": "cd .. && backend/node_modules/.bin/oxlint --deny-warnings backend/src backend/test backend/scripts backend/*.ts scripts",
@@ -24,7 +24,9 @@
     "contracts:generate": "node --import tsx scripts/contracts.ts",
     "contracts:check": "node --import tsx scripts/contracts.ts --check",
     "fixtures:reset": "node --env-file=../.env --import tsx scripts/fixtures.ts",
-    "check": "npm run lint && npm run format:check && npm run typecheck && npm run test:run && npm run contracts:check && npm run build"
+    "check": "npm run lint && npm run format:check && npm run typecheck && npm run test:run && npm run contracts:check && npm run build",
+    "db:check": "node --import tsx scripts/database.ts check",
+    "db:inspect": "node --import tsx scripts/database.ts inspect"
   },
   "dependencies": {
     "@fastify/type-provider-typebox": "^6.3.0",

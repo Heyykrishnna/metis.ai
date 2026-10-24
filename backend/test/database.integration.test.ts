@@ -1,10 +1,12 @@
 import { randomBytes } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
-import { migrate } from "drizzle-orm/postgres-js/migrator";
+import { migrate } from "drizzle-orm/node-postgres/migrator";
 import postgres from "postgres";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { provisionFixtureReader, resetAnalytics } from "../scripts/fixtures.js";
+import { buildApp } from "../src/app.js";
+import { verifyMetadataSchema } from "../src/db/verify.js";
 import { createMetadataDb } from "../src/db/index.js";
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
@@ -17,7 +19,8 @@ if (!/^\/metis_[a-z0-9_]+_test$/.test(parsedUrl.pathname))
   throw new Error(
     "Integration tests require a dedicated metis_*_test database",
   );
-const { db, client } = createMetadataDb(databaseUrl);
+const { db, pool } = createMetadataDb(databaseUrl);
+const client = postgres(databaseUrl);
 let reader: ReturnType<typeof postgres>;
 const readerPassword = randomBytes(24).toString("hex");
 const readerName = `metis_test_reader_${randomBytes(8).toString("hex")}`;
@@ -49,6 +52,7 @@ afterAll(async () => {
     }
   } finally {
     await client.end();
+    await pool.end();
   }
 });
 
@@ -181,5 +185,36 @@ describe("disposable PostgreSQL foundation", () => {
     const second = await provisionFixtureReader(client, readerPassword);
     expect(second).toEqual({ name: first.name, created: false });
     expect(second.name).not.toBe(readerName);
+  });
+
+  it("verifies the generated metadata schema through the application driver", async () => {
+    await expect(verifyMetadataSchema(pool)).resolves.toMatchObject({
+      tables: 13,
+    });
+  });
+
+  it("detects schema drift rather than declaring an incomplete schema synchronized", async () => {
+    await pool.query(
+      "ALTER TABLE workspaces RENAME COLUMN name TO incorrect_name",
+    );
+    try {
+      await expect(verifyMetadataSchema(pool)).rejects.toThrow(
+        "Metadata column mismatch: workspaces.name",
+      );
+    } finally {
+      await pool.query(
+        "ALTER TABLE workspaces RENAME COLUMN incorrect_name TO name",
+      );
+    }
+  });
+
+  it("starts and closes the API with a configured metadata connection", async () => {
+    const app = await buildApp(databaseUrl);
+    try {
+      const response = await app.inject({ method: "GET", url: "/health" });
+      expect(response.statusCode).toBe(200);
+    } finally {
+      await app.close();
+    }
   });
 });

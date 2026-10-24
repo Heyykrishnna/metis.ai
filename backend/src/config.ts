@@ -46,18 +46,20 @@ export function readConfig(source: NodeJS.ProcessEnv) {
   }
 
   const databaseUrl = source.DATABASE_URL;
-  if (databaseUrl !== undefined) {
+  for (const key of ["DATABASE_URL", "DATABASE_URL_UNPOOLED"] as const) {
+    const value = source[key];
+    if (value === undefined) continue;
     let valid = false;
     try {
-      const parsed = new URL(databaseUrl);
+      const parsed = new URL(value);
       valid =
         ["postgres:", "postgresql:"].includes(parsed.protocol) &&
         parsed.hostname.length > 0 &&
         parsed.pathname.length > 1;
     } catch {
-      throw new Error("Invalid configuration: DATABASE_URL");
+      throw new Error(`Invalid configuration: ${key}`);
     }
-    if (!valid) throw new Error("Invalid configuration: DATABASE_URL");
+    if (!valid) throw new Error(`Invalid configuration: ${key}`);
   }
   if (environment === "production" && databaseUrl === undefined) {
     throw new Error("Missing configuration: DATABASE_URL");
@@ -69,6 +71,7 @@ export function readConfig(source: NodeJS.ProcessEnv) {
     PORT: port,
     LOG_LEVEL: logLevel,
     DATABASE_URL: databaseUrl,
+    DATABASE_URL_UNPOOLED: source.DATABASE_URL_UNPOOLED,
   } as const;
 }
 
