@@ -4,6 +4,7 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["test/**/*.test.ts"],
+    exclude: ["test/**/*.integration.test.ts"],
     env: {
       NODE_ENV: "test",
       LOG_LEVEL: "silent",

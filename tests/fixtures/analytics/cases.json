@@ -1,0 +1,16 @@
+{
+  "version": "1.0.0",
+  "development": [
+    { "id": "schools-calendar-decline-001", "question": "Which schools had lower enrolment in calendar 2025 than calendar 2024?", "schema": "analytics_clean", "expected": { "rows": [{ "school_id": 1, "delta": -20 }, { "school_id": 4, "delta": -10 }], "validSchools": 4, "excludedSchools": 2, "allSchools": 6 } },
+    { "id": "missing-period-001", "schema": "analytics_clean", "expected": { "schoolId": 5, "missingYear": 2025 } },
+    { "id": "null-measure-001", "schema": "analytics_clean", "expected": { "schoolId": 6, "nullYear": 2025 } },
+    { "id": "duplicate-period-001", "schema": "analytics_dirty", "expected": { "duplicateSchoolId": 1, "count": 2 } },
+    { "id": "sentinel-values-001", "schema": "analytics_dirty", "expected": { "unreviewedValues": ["N/A", "unknown", "-"] } },
+    { "id": "ambiguous-date-001", "schema": "analytics_dirty", "expected": { "values": ["01/02/2025", "02/01/2025"], "action": "needs_clarification" } },
+    { "id": "join-fanout-001", "schema": "analytics_dirty", "expected": { "schoolId": 1, "multiplier": 3 } },
+    { "id": "forbidden-object-001", "schema": "private_data", "expected": { "action": "blocked_by_policy" } }
+  ],
+  "heldOut": [
+    { "id": "renamed-schema-decline-001", "schema": "analytics_heldout", "expected": { "rows": [{ "org_k": 91, "delta": -50 }] } }
+  ]
+}

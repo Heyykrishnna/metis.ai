@@ -16,7 +16,15 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "lint": "cd .. && backend/node_modules/.bin/oxlint --deny-warnings backend/src backend/test backend/scripts backend/*.ts scripts",
+    "format": "prettier --write src test scripts *.ts *.json ../scripts ../docs/engineering ../inference ../compose.yaml ../.github/workflows ../README.md ../GLOSSARY.md ../skills.lock.json ../.prettierrc.json",
+    "format:check": "prettier --check src test scripts *.ts *.json ../scripts ../docs/engineering ../inference ../compose.yaml ../.github/workflows ../README.md ../GLOSSARY.md ../skills.lock.json ../.prettierrc.json",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "contracts:generate": "node --import tsx scripts/contracts.ts",
+    "contracts:check": "node --import tsx scripts/contracts.ts --check",
+    "fixtures:reset": "node --env-file=../.env --import tsx scripts/fixtures.ts",
+    "check": "npm run lint && npm run format:check && npm run typecheck && npm run test:run && npm run contracts:check && npm run build"
   },
   "dependencies": {
     "@fastify/type-provider-typebox": "^6.3.0",
@@ -25,16 +33,25 @@
     "drizzle-orm": "^0.45.4",
     "fastify": "^5.12.7",
     "node-sql-parser": "^5.4.0",
+    "pg": "^8.23.1",
     "pino": "^10.4.0",
     "postgres": "^3.4.9",
     "typebox": "^1.4.3"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",
+    "@types/pg": "^8.23.1",
     "drizzle-kit": "^0.31.11",
+    "oxlint": "^1.89.0",
     "pino-pretty": "^13.2.0",
+    "prettier": "^3.9.10",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vitest": "^5.0.5"
+  },
+  "overrides": {
+    "@esbuild-kit/core-utils": {
+      "esbuild": "^0.25.0"
+    }
   }
 }

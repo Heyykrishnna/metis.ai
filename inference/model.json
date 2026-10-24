@@ -1,0 +1,22 @@
+{
+  "version": "1.0.0",
+  "checkpoint": "Qwen/Qwen2.5-Coder-7B-Instruct",
+  "upstreamRevision": "c03e6d358207e414f1eca0bb1891e29f1db0e242",
+  "parameterCount": 7615616512,
+  "license": "Apache-2.0",
+  "runtime": "Ollama",
+  "model": "qwen2.5-coder:7b-instruct-q4_K_M",
+  "artifactDigest": "sha256:dae161e27b0e90dd1856c8bb3209201fd6736d8eb66298e75ed87571486f4364",
+  "quantization": "Q4_K_M",
+  "baseUrl": "http://127.0.0.1:11434",
+  "options": { "temperature": 0, "num_ctx": 8192, "num_predict": 1024 },
+  "dataBoundary": "local-only",
+  "hardwareReadiness": "not-tested",
+  "verifiedMetadataDate": "2026-10-24",
+  "sources": [
+    "https://huggingface.co/api/models/Qwen/Qwen2.5-Coder-7B-Instruct",
+    "https://huggingface.co/Qwen/Qwen2.5-Coder-7B-Instruct",
+    "https://registry.ollama.ai/v2/library/qwen2.5-coder/manifests/7b-instruct-q4_K_M",
+    "https://docs.ollama.com/capabilities/structured-outputs"
+  ]
+}

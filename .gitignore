@@ -1,3 +1,7 @@
-skills
+/skills/
 AGENTS.md
 /project-phases/
+.env
+.env.*
+!.env.example
+.DS_Store
