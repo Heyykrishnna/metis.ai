@@ -56,6 +56,7 @@ import { FileDropzone } from "./ui/file-dropzone";
 import { FormattedMarkdown } from "./ui/formatted-markdown";
 import { ThinkingPanel } from "./ui/thinking-panel";
 import { Orb } from "./ui/orb";
+import { BrandMark } from "./brand-mark";
 import { analysisActivity } from "@/lib/analysis-activity";
 import { useQuestions } from "./use-questions";
 import {
@@ -781,9 +782,7 @@ export function Workspace() {
             aria-label="Metis home"
             onClick={() => navigate("Home")}
           >
-            <span className="brand-mark" aria-hidden="true">
-              m
-            </span>
+            <BrandMark />
             <span>
               metis<span className="brand-ai">.ai</span>
             </span>
@@ -881,16 +880,6 @@ export function Workspace() {
             <span>{view === "Home" ? "Home" : view}</span>
           </div>
           <div className="topbar-actions">
-            {(syncing || reading) && (
-              <span
-                className="sync-status"
-                role="status"
-                aria-label={reading ? "Saving files" : "Syncing workspace"}
-              >
-                <Orb size={20} />
-                <span>{reading ? "Saving files" : "Syncing workspace"}</span>
-              </span>
-            )}
             <span className="private-badge">
               <Icon name="shield" size={13} /> Private workspace
             </span>
@@ -930,6 +919,7 @@ export function Workspace() {
               setMode={setMode}
               source={source}
               sourceCount={documents.length + connections.length}
+              syncing={syncing || reading}
               submitQuestion={submitQuestion}
               navigate={navigate}
               applyTemplate={applyTemplate}
