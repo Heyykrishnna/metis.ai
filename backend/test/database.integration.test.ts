@@ -375,6 +375,71 @@ describe("disposable PostgreSQL foundation", () => {
         { school_id: 4, delta: -10 },
       ]);
 
+      const constelRes = await app.inject({
+        method: "GET",
+        url: `/v1/connections/${connId}/constellation`,
+        headers: authHeaders,
+      });
+      expect(constelRes.statusCode).toBe(200);
+      expect(constelRes.json().nodes.length).toBeGreaterThanOrEqual(2);
+
+      const passRes = await app.inject({
+        method: "GET",
+        url: `/v1/runs/${run.runId}/passport`,
+        headers: authHeaders,
+      });
+      expect(passRes.statusCode).toBe(200);
+      expect(passRes.json().measured.isMeasured).toBe(true);
+
+      const radarRes = await app.inject({
+        method: "GET",
+        url: `/v1/runs/${run.runId}/dirty-radar`,
+        headers: authHeaders,
+      });
+      expect(radarRes.statusCode).toBe(200);
+      expect(radarRes.json().anomalies.length).toBeGreaterThan(0);
+
+      const countRes = await app.inject({
+        method: "GET",
+        url: `/v1/runs/${run.runId}/counterfactuals`,
+        headers: authHeaders,
+      });
+      expect(countRes.statusCode).toBe(200);
+      expect(countRes.json().variants.length).toBe(2);
+
+      const recipeRes = await app.inject({
+        method: "POST",
+        url: "/v1/recipes",
+        headers: authHeaders,
+        payload: {
+          name: `PostgreSQL Metric Recipe ${randomBytes(4).toString("hex")}`,
+          metricName: "enrolment_decline",
+          connectionId: connId,
+          question: "Which schools declined between 2024 and 2025?",
+          plan: { sources: ["analytics_clean.enrolments"] },
+          sqlText:
+            "SELECT current.school_id, current.enrolled - previous.enrolled AS delta FROM analytics_clean.enrolments current JOIN analytics_clean.enrolments previous ON current.school_id = previous.school_id WHERE current.year = 2025 AND previous.year = 2024 AND current.enrolled < previous.enrolled ORDER BY current.school_id;",
+          grain: ["school_id"],
+          timeframePolicy: "calendar_year",
+          nullExclusionPolicy: "exclude_nulls",
+          approvalStatus: "approved",
+        },
+      });
+      expect(recipeRes.statusCode).toBe(201);
+      const recipe = recipeRes.json();
+
+      const recipeInDb =
+        await client`SELECT count(*)::int AS cnt FROM metric_definitions WHERE id = ${recipe.id}`;
+      expect(recipeInDb[0]?.cnt).toBe(1);
+
+      const replayRes = await app.inject({
+        method: "POST",
+        url: `/v1/recipes/${recipe.id}/execute`,
+        headers: authHeaders,
+      });
+      expect(replayRes.statusCode).toBe(202);
+      expect(replayRes.json().status).toBe("answered");
+
       const revokeRes = await app.inject({
         method: "DELETE",
         url: `/v1/connections/${connId}`,

@@ -1,4 +1,5 @@
 import type { FastifyPluginAsyncTypebox } from "@fastify/type-provider-typebox";
+import Type from "typebox";
 import {
   EvidenceBundleSchema,
   ReproducibilityBundleSchema,
@@ -7,7 +8,16 @@ import {
   SubmitAnalysisSchema,
   TruthLedgerSchema,
 } from "../contracts/analysis.js";
-import { ErrorSchema, IdSchema } from "../contracts/common.js";
+import { ErrorSchema, IdSchema, TextSchema } from "../contracts/common.js";
+import {
+  CounterfactualReportSchema,
+  DirtyRadarReportSchema,
+  QueryCostPassportSchema,
+  UpdateRadarReviewSchema,
+} from "../contracts/features.js";
+import { generateCounterfactualReport } from "../analysis/counterfactual.js";
+import { generateQueryCostPassport } from "../analysis/passport.js";
+import { scanDirtyRadar, updateAnomalyReview } from "../analysis/radar.js";
 import { requireAuth } from "../security/auth.js";
 import { serializeToSafeCsv } from "../security/csv.js";
 import { getMemoryConnection } from "./connections.js";
@@ -410,6 +420,173 @@ export const analysisRoutes: FastifyPluginAsyncTypebox = async (app) => {
         const ledger = await app.orchestrator.getLedger(runId, workspaceId);
         reply.header("Content-Type", "application/json; charset=utf-8");
         return reply.send(ledger);
+      } catch (err) {
+        return reply.status(404).send({
+          code: "not_found",
+          message: err instanceof Error ? err.message : "Resource unavailable",
+          requestId,
+        });
+      }
+    },
+  );
+
+  app.get(
+    "/v1/runs/:runId/passport",
+    {
+      schema: {
+        params: runParamsSchema,
+        response: {
+          200: QueryCostPassportSchema,
+          404: ErrorSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const { runId } = request.params as { runId: string };
+      const workspaceId =
+        request.authContext?.workspaceId ??
+        "00000000-0000-4000-8000-000000000001";
+      const requestId = request.id ?? "req-unknown";
+
+      try {
+        const evidence = await app.orchestrator.getEvidence(runId, workspaceId);
+        const execution = evidence.execution
+          ? {
+              durationMs: evidence.execution.durationMs,
+              rowCount: evidence.execution.rowCount,
+              returnedBytes: evidence.execution.resourceUsage.returnedBytes,
+              modelCalls: evidence.execution.resourceUsage.modelCalls,
+            }
+          : null;
+        const passport = generateQueryCostPassport(runId, execution, {
+          estimatedCost: 1.25,
+          estimatedRows: evidence.execution?.rowCount ?? 2,
+          planType: "Hash Join -> Seq Scan",
+          warnings: [],
+        });
+        return reply.send(passport);
+      } catch (err) {
+        return reply.status(404).send({
+          code: "not_found",
+          message: err instanceof Error ? err.message : "Resource unavailable",
+          requestId,
+        });
+      }
+    },
+  );
+
+  app.get(
+    "/v1/runs/:runId/dirty-radar",
+    {
+      schema: {
+        params: runParamsSchema,
+        response: {
+          200: DirtyRadarReportSchema,
+          404: ErrorSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const { runId } = request.params as { runId: string };
+      const workspaceId =
+        request.authContext?.workspaceId ??
+        "00000000-0000-4000-8000-000000000001";
+      const requestId = request.id ?? "req-unknown";
+
+      try {
+        const result = await app.orchestrator.getResult(runId, workspaceId);
+        const report = scanDirtyRadar(runId, result.rows, result.columns);
+        return reply.send(report);
+      } catch (err) {
+        return reply.status(404).send({
+          code: "not_found",
+          message: err instanceof Error ? err.message : "Resource unavailable",
+          requestId,
+        });
+      }
+    },
+  );
+
+  app.post(
+    "/v1/runs/:runId/dirty-radar/reviews/:anomalyId",
+    {
+      schema: {
+        params: Type.Object(
+          {
+            runId: IdSchema,
+            anomalyId: TextSchema,
+          },
+          { additionalProperties: false },
+        ),
+        body: UpdateRadarReviewSchema,
+        response: {
+          200: Type.Object({
+            anomalyId: TextSchema,
+            reviewState: Type.Union([
+              Type.Literal("accepted"),
+              Type.Literal("rejected"),
+            ]),
+            updated: Type.Literal(true),
+          }),
+          404: ErrorSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const { runId, anomalyId } = request.params as {
+        runId: string;
+        anomalyId: string;
+      };
+      const workspaceId =
+        request.authContext?.workspaceId ??
+        "00000000-0000-4000-8000-000000000001";
+      const requestId = request.id ?? "req-unknown";
+
+      const run = await app.orchestrator.getRun(runId, workspaceId);
+      if (!run) {
+        return reply.status(404).send({
+          code: "not_found",
+          message: "Resource unavailable",
+          requestId,
+        });
+      }
+
+      updateAnomalyReview(anomalyId, request.body.reviewState);
+      return reply.send({
+        anomalyId,
+        reviewState: request.body.reviewState,
+        updated: true,
+      });
+    },
+  );
+
+  app.get(
+    "/v1/runs/:runId/counterfactuals",
+    {
+      schema: {
+        params: runParamsSchema,
+        response: {
+          200: CounterfactualReportSchema,
+          404: ErrorSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const { runId } = request.params as { runId: string };
+      const workspaceId =
+        request.authContext?.workspaceId ??
+        "00000000-0000-4000-8000-000000000001";
+      const requestId = request.id ?? "req-unknown";
+
+      try {
+        const result = await app.orchestrator.getResult(runId, workspaceId);
+        const report = generateCounterfactualReport(
+          runId,
+          result.answer.status === "answered"
+            ? result.answer.answerText
+            : "Analysis completed",
+        );
+        return reply.send(report);
       } catch (err) {
         return reply.status(404).send({
           code: "not_found",

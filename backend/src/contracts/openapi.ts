@@ -22,6 +22,15 @@ import {
   ConnectionTestSchema,
   FeedbackSchema,
 } from "./connections.js";
+import {
+  CounterfactualReportSchema,
+  DirtyRadarReportSchema,
+  QueryCostPassportSchema,
+  RecipeExecuteResponseSchema,
+  RecipeInputSchema,
+  RecipeSchema,
+  SchemaConstellationSchema,
+} from "./features.js";
 
 const apiSchemas = {
   QuestionIntent: QuestionIntentSchema,
@@ -45,6 +54,14 @@ const apiSchemas = {
   SubmitAnalysis: SubmitAnalysisSchema,
   TruthLedger: TruthLedgerSchema,
   ReproducibilityBundle: ReproducibilityBundleSchema,
+  SchemaConstellation: SchemaConstellationSchema,
+  QueryCostPassport: QueryCostPassportSchema,
+  DirtyRadarReport: DirtyRadarReportSchema,
+  CounterfactualReport: CounterfactualReportSchema,
+  RecipeInput: RecipeInputSchema,
+  Recipe: RecipeSchema,
+  Recipes: Type.Array(RecipeSchema, { maxItems: 100 }),
+  RecipeExecuteResponse: RecipeExecuteResponseSchema,
   FeedbackReceipt: Type.Object(
     { id: IdSchema },
     { additionalProperties: false },
@@ -131,6 +148,12 @@ export const openApiDocument = {
       get: operation("getConnection", ref("Connection")),
       delete: operation("revokeConnection", ref("Connection")),
     },
+    "/v1/connections/{connectionId}/constellation": {
+      parameters: [
+        { name: "connectionId", in: "path", required: true, schema: IdSchema },
+      ],
+      get: operation("getSchemaConstellation", ref("SchemaConstellation")),
+    },
     "/v1/analyses": {
       post: operation(
         "submitAnalysis",
@@ -215,6 +238,39 @@ export const openApiDocument = {
     "/v1/runs/{runId}/ledger": {
       parameters: runParameters,
       get: operation("getTruthLedger", ref("TruthLedger")),
+    },
+    "/v1/runs/{runId}/passport": {
+      parameters: runParameters,
+      get: operation("getQueryCostPassport", ref("QueryCostPassport")),
+    },
+    "/v1/runs/{runId}/dirty-radar": {
+      parameters: runParameters,
+      get: operation("getDirtyRadarReport", ref("DirtyRadarReport")),
+    },
+    "/v1/runs/{runId}/counterfactuals": {
+      parameters: runParameters,
+      get: operation("getCounterfactualReport", ref("CounterfactualReport")),
+    },
+    "/v1/recipes": {
+      post: operation("createRecipe", ref("Recipe"), ref("RecipeInput"), "201"),
+      get: operation("listRecipes", ref("Recipes")),
+    },
+    "/v1/recipes/{recipeId}": {
+      parameters: [
+        { name: "recipeId", in: "path", required: true, schema: IdSchema },
+      ],
+      get: operation("getRecipe", ref("Recipe")),
+    },
+    "/v1/recipes/{recipeId}/execute": {
+      parameters: [
+        { name: "recipeId", in: "path", required: true, schema: IdSchema },
+      ],
+      post: operation(
+        "executeRecipe",
+        ref("RecipeExecuteResponse"),
+        undefined,
+        "202",
+      ),
     },
     "/v1/feedback": {
       post: operation(

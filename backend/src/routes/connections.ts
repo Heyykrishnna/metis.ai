@@ -8,6 +8,9 @@ import {
   ConnectionSchema,
   ConnectionTestSchema,
 } from "../contracts/connections.js";
+import { SchemaConstellationSchema } from "../contracts/features.js";
+import { discoverSchema } from "../analysis/schema.js";
+import { generateSchemaConstellation } from "../analysis/constellation.js";
 import { connections } from "../db/schema.js";
 import { requireAuth } from "../security/auth.js";
 import { validateDestination } from "../security/destinations.js";
@@ -380,6 +383,60 @@ export const connectionRoutes: FastifyPluginAsyncTypebox = async (app) => {
         message: "Resource unavailable",
         requestId,
       });
+    },
+  );
+
+  app.get(
+    "/v1/connections/:connectionId/constellation",
+    {
+      schema: {
+        params: Type.Object(
+          {
+            connectionId: IdSchema,
+          },
+          { additionalProperties: false },
+        ),
+        response: {
+          200: SchemaConstellationSchema,
+          404: ErrorSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const { connectionId } = request.params as { connectionId: string };
+      const workspaceId =
+        request.authContext?.workspaceId ??
+        "00000000-0000-4000-8000-000000000001";
+      const requestId = request.id ?? "req-unknown";
+
+      const conn = getMemoryConnection(connectionId, workspaceId);
+      if (!conn || conn.status === "revoked") {
+        return reply.status(404).send({
+          code: "not_found",
+          message: "Connection not found or revoked in workspace",
+          requestId,
+        });
+      }
+
+      try {
+        const adapter = app.orchestrator.getAdapter();
+        const discovered = await discoverSchema(adapter, conn.allowedSchemas);
+        const constellation = generateSchemaConstellation(
+          connectionId,
+          randomUUID(),
+          discovered,
+        );
+        return reply.send(constellation);
+      } catch (err) {
+        return reply.status(404).send({
+          code: "not_found",
+          message:
+            err instanceof Error
+              ? err.message
+              : "Failed to generate constellation",
+          requestId,
+        });
+      }
     },
   );
 };

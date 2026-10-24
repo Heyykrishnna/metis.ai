@@ -467,6 +467,100 @@
         }
       }
     },
+    "/v1/connections/{connectionId}/constellation": {
+      "parameters": [
+        {
+          "name": "connectionId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "getSchemaConstellation",
+        "x-implementation-status": "planned",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SchemaConstellation"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Resource limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/analyses": {
       "post": {
         "operationId": "submitAnalysis",
@@ -1249,6 +1343,650 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/TruthLedger"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Resource limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/runs/{runId}/passport": {
+      "parameters": [
+        {
+          "name": "runId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "getQueryCostPassport",
+        "x-implementation-status": "planned",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueryCostPassport"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Resource limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/runs/{runId}/dirty-radar": {
+      "parameters": [
+        {
+          "name": "runId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "getDirtyRadarReport",
+        "x-implementation-status": "planned",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DirtyRadarReport"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Resource limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/runs/{runId}/counterfactuals": {
+      "parameters": [
+        {
+          "name": "runId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "getCounterfactualReport",
+        "x-implementation-status": "planned",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CounterfactualReport"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Resource limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/recipes": {
+      "post": {
+        "operationId": "createRecipe",
+        "x-implementation-status": "planned",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecipeInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Recipe"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Resource limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "listRecipes",
+        "x-implementation-status": "planned",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Recipes"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Resource limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/recipes/{recipeId}": {
+      "parameters": [
+        {
+          "name": "recipeId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "getRecipe",
+        "x-implementation-status": "planned",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Recipe"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Resource limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/recipes/{recipeId}/execute": {
+      "parameters": [
+        {
+          "name": "recipeId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          }
+        }
+      ],
+      "post": {
+        "operationId": "executeRecipe",
+        "x-implementation-status": "planned",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecipeExecuteResponse"
                 }
               }
             }
@@ -5432,6 +6170,929 @@
           "exportedAt": {
             "type": "string",
             "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SchemaConstellation": {
+        "type": "object",
+        "required": [
+          "connectionId",
+          "snapshotId",
+          "schemaHash",
+          "nodes",
+          "edges",
+          "generatedAt"
+        ],
+        "properties": {
+          "connectionId": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "snapshotId": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "schemaHash": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "nodes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "name",
+                "schema",
+                "columns",
+                "primaryKey",
+                "rowCount"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                "columns": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "name",
+                      "type",
+                      "nullable"
+                    ],
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 4096
+                      },
+                      "type": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 4096
+                      },
+                      "nullable": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "maxItems": 100
+                },
+                "primaryKey": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4096
+                  },
+                  "maxItems": 10
+                },
+                "rowCount": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "additionalProperties": false
+            },
+            "maxItems": 100
+          },
+          "edges": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "sourceTable",
+                "sourceColumn",
+                "targetTable",
+                "targetColumn",
+                "confidence",
+                "isAuthoritative",
+                "notes"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                "sourceTable": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                "sourceColumn": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                "targetTable": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                "targetColumn": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                "confidence": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "const": "declared"
+                    },
+                    {
+                      "type": "string",
+                      "const": "inferred_name"
+                    },
+                    {
+                      "type": "string",
+                      "const": "inferred_type"
+                    },
+                    {
+                      "type": "string",
+                      "const": "inferred_overlap"
+                    },
+                    {
+                      "type": "string",
+                      "const": "inferred_cardinality"
+                    }
+                  ]
+                },
+                "isAuthoritative": {
+                  "type": "boolean"
+                },
+                "notes": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                }
+              },
+              "additionalProperties": false
+            },
+            "maxItems": 200
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "QueryCostPassport": {
+        "type": "object",
+        "required": [
+          "runId",
+          "measured",
+          "limits",
+          "advisoryEstimate",
+          "safetySummary"
+        ],
+        "properties": {
+          "runId": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "measured": {
+            "type": "object",
+            "required": [
+              "durationMs",
+              "rowCount",
+              "returnedBytes",
+              "modelCalls",
+              "isMeasured"
+            ],
+            "properties": {
+              "durationMs": {
+                "type": "number",
+                "minimum": 0
+              },
+              "rowCount": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "returnedBytes": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "modelCalls": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "isMeasured": {
+                "type": "boolean",
+                "const": true
+              }
+            },
+            "additionalProperties": false
+          },
+          "limits": {
+            "type": "object",
+            "required": [
+              "timeoutMs",
+              "maxRows",
+              "modelCallsLimit",
+              "policyEnforced"
+            ],
+            "properties": {
+              "timeoutMs": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "maxRows": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "modelCallsLimit": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "policyEnforced": {
+                "type": "boolean",
+                "const": true
+              }
+            },
+            "additionalProperties": false
+          },
+          "advisoryEstimate": {
+            "type": "object",
+            "required": [
+              "estimatedCost",
+              "estimatedRows",
+              "planType",
+              "warnings",
+              "isEstimated",
+              "isAvailable"
+            ],
+            "properties": {
+              "estimatedCost": {
+                "type": "number",
+                "minimum": 0
+              },
+              "estimatedRows": {
+                "type": "number",
+                "minimum": 0
+              },
+              "planType": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4096
+              },
+              "warnings": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                "maxItems": 20
+              },
+              "isEstimated": {
+                "type": "boolean",
+                "const": true
+              },
+              "isAvailable": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          },
+          "safetySummary": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          }
+        },
+        "additionalProperties": false
+      },
+      "DirtyRadarReport": {
+        "type": "object",
+        "required": [
+          "runId",
+          "anomalies",
+          "totalScannedRows",
+          "generatedAt"
+        ],
+        "properties": {
+          "runId": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "anomalies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "ruleId",
+                "sourceObject",
+                "field",
+                "observedPattern",
+                "sampleCount",
+                "samplingMethod",
+                "estimatedPrevalence",
+                "proposedMapping",
+                "reviewState"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                "ruleId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                "sourceObject": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                "field": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                "observedPattern": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                "sampleCount": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "samplingMethod": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "const": "deterministic_scan"
+                    },
+                    {
+                      "type": "string",
+                      "const": "bounded_sample"
+                    }
+                  ]
+                },
+                "estimatedPrevalence": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "proposedMapping": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                "reviewState": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "const": "unreviewed"
+                    },
+                    {
+                      "type": "string",
+                      "const": "accepted"
+                    },
+                    {
+                      "type": "string",
+                      "const": "rejected"
+                    }
+                  ]
+                }
+              },
+              "additionalProperties": false
+            },
+            "maxItems": 100
+          },
+          "totalScannedRows": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CounterfactualReport": {
+        "type": "object",
+        "required": [
+          "primaryRunId",
+          "variants",
+          "differences",
+          "isMaterialDifference",
+          "recommendation"
+        ],
+        "properties": {
+          "primaryRunId": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "variants": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "name",
+                "definition",
+                "periodSemantics",
+                "predicates",
+                "grain",
+                "rowCount",
+                "deltaSummary",
+                "coverage"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                "definition": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                "periodSemantics": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                "predicates": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4096
+                  },
+                  "maxItems": 20
+                },
+                "grain": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4096
+                  },
+                  "maxItems": 10
+                },
+                "rowCount": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "deltaSummary": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                "coverage": {
+                  "type": "object",
+                  "required": [
+                    "included",
+                    "excluded",
+                    "denominator"
+                  ],
+                  "properties": {
+                    "included": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "excluded": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "denominator": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "additionalProperties": false
+            },
+            "maxItems": 10
+          },
+          "differences": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "dimension",
+                "primaryValue",
+                "counterfactualValue",
+                "isMaterial"
+              ],
+              "properties": {
+                "dimension": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                "primaryValue": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                "counterfactualValue": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                "isMaterial": {
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false
+            },
+            "maxItems": 50
+          },
+          "isMaterialDifference": {
+            "type": "boolean"
+          },
+          "recommendation": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          }
+        },
+        "additionalProperties": false
+      },
+      "RecipeInput": {
+        "type": "object",
+        "required": [
+          "name",
+          "metricName",
+          "connectionId",
+          "question",
+          "plan",
+          "sqlText",
+          "grain",
+          "timeframePolicy",
+          "nullExclusionPolicy",
+          "approvalStatus"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "\\S"
+          },
+          "metricName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "pattern": "\\S"
+          },
+          "connectionId": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "question": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096,
+            "pattern": "\\S"
+          },
+          "plan": {
+            "type": "object",
+            "patternProperties": {
+              "^.*$": {}
+            }
+          },
+          "sqlText": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 32768
+          },
+          "grain": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            "minItems": 1,
+            "maxItems": 20
+          },
+          "timeframePolicy": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "nullExclusionPolicy": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "approvalStatus": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "draft"
+              },
+              {
+                "type": "string",
+                "const": "approved"
+              },
+              {
+                "type": "string",
+                "const": "archived"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "Recipe": {
+        "type": "object",
+        "required": [
+          "id",
+          "workspaceId",
+          "name",
+          "metricName",
+          "version",
+          "ownerSubject",
+          "connectionId",
+          "question",
+          "plan",
+          "sqlText",
+          "grain",
+          "timeframePolicy",
+          "nullExclusionPolicy",
+          "approvalStatus",
+          "createdAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "workspaceId": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "metricName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "ownerSubject": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "connectionId": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "question": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "plan": {
+            "type": "object",
+            "patternProperties": {
+              "^.*$": {}
+            }
+          },
+          "sqlText": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "grain": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            "minItems": 1,
+            "maxItems": 20
+          },
+          "timeframePolicy": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "nullExclusionPolicy": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "approvalStatus": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "draft"
+              },
+              {
+                "type": "string",
+                "const": "approved"
+              },
+              {
+                "type": "string",
+                "const": "archived"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "Recipes": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": [
+            "id",
+            "workspaceId",
+            "name",
+            "metricName",
+            "version",
+            "ownerSubject",
+            "connectionId",
+            "question",
+            "plan",
+            "sqlText",
+            "grain",
+            "timeframePolicy",
+            "nullExclusionPolicy",
+            "approvalStatus",
+            "createdAt"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            },
+            "workspaceId": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            "metricName": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            "version": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "ownerSubject": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            "connectionId": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            },
+            "question": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            "plan": {
+              "type": "object",
+              "patternProperties": {
+                "^.*$": {}
+              }
+            },
+            "sqlText": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            "grain": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4096
+              },
+              "minItems": 1,
+              "maxItems": 20
+            },
+            "timeframePolicy": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            "nullExclusionPolicy": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            "approvalStatus": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "const": "draft"
+                },
+                {
+                  "type": "string",
+                  "const": "approved"
+                },
+                {
+                  "type": "string",
+                  "const": "archived"
+                }
+              ]
+            },
+            "createdAt": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          "additionalProperties": false
+        },
+        "maxItems": 100
+      },
+      "RecipeExecuteResponse": {
+        "type": "object",
+        "required": [
+          "recipeId",
+          "runId",
+          "status"
+        ],
+        "properties": {
+          "recipeId": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "runId": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "status": {
+            "enum": [
+              "queued",
+              "parsing",
+              "retrieving",
+              "grounding",
+              "planning",
+              "generating",
+              "authorizing",
+              "estimating",
+              "executing",
+              "verifying",
+              "challenging",
+              "answered",
+              "needs_clarification",
+              "abstained",
+              "blocked_by_policy",
+              "execution_failed",
+              "timed_out",
+              "cancelled"
+            ]
           }
         },
         "additionalProperties": false
