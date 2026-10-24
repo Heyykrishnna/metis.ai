@@ -41,10 +41,7 @@ export class GroqClient {
   private readonly fetcher: typeof fetch;
 
   constructor(options?: GroqClientOptions) {
-    this.apiKey =
-      options?.apiKey ??
-      process.env.GROQ_API_KEY ??
-      "";
+    this.apiKey = options?.apiKey ?? process.env.GROQ_API_KEY ?? "";
     this.model =
       options?.model ?? process.env.GROQ_MODEL ?? "openai/gpt-oss-120b";
     this.baseUrl =

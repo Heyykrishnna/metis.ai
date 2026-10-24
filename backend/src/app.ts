@@ -6,7 +6,7 @@ import {
 import { AnalysisOrchestrator } from "./analysis/orchestrator.js";
 import { createMetadataDb, type MetadataDatabase } from "./db/index.js";
 import {
-  OllamaInferenceClient,
+  createInferenceClient,
   type InferenceClient,
 } from "./inference/client.js";
 import { logger } from "./logger.js";
@@ -75,7 +75,7 @@ export async function buildApp(
   };
 
   const defaultInference: InferenceClient =
-    options.inference ?? new OllamaInferenceClient();
+    options.inference ?? createInferenceClient();
 
   const orchestrator =
     options.orchestrator ??

@@ -22,34 +22,53 @@ export const capabilitiesRoutes: FastifyPluginAsyncTypebox = async (app) => {
       },
     },
     async () => {
-      const model =
-        process.env.INFERENCE_MODEL ?? "qwen2.5-coder:7b-instruct-q4_K_M";
+      const defaultModel =
+        process.env.NVIDIA_API_KEY ||
+        process.env.INFERENCE_PROVIDER === "nvidia"
+          ? "nvidia/nemotron-3.5-lightning"
+          : "nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-BF16";
+      const model = process.env.INFERENCE_MODEL ?? defaultModel;
+
       let inferenceAvailable = false;
-      try {
-        const response = await fetch(
-          new URL(
-            "/api/tags",
-            process.env.INFERENCE_BASE_URL ?? "http://127.0.0.1:11434",
-          ),
-          { signal: AbortSignal.timeout(3000) },
-        );
-        const body: unknown = await response.json();
-        inferenceAvailable =
-          response.ok &&
-          typeof body === "object" &&
-          body !== null &&
-          "models" in body &&
-          Array.isArray(body.models) &&
-          body.models.some(
-            (item: unknown) =>
-              typeof item === "object" &&
-              item !== null &&
-              "name" in item &&
-              item.name === model,
+      const hasCloudToken = Boolean(
+        (process.env.HF_TOKEN && process.env.HF_TOKEN.trim().length > 0) ||
+        (process.env.HUGGINGFACE_API_KEY &&
+          process.env.HUGGINGFACE_API_KEY.trim().length > 0) ||
+        (process.env.NVIDIA_API_KEY &&
+          process.env.NVIDIA_API_KEY.trim().length > 0),
+      );
+
+      if (hasCloudToken) {
+        inferenceAvailable = true;
+      } else {
+        try {
+          const response = await fetch(
+            new URL(
+              "/api/tags",
+              process.env.INFERENCE_BASE_URL ?? "http://127.0.0.1:11434",
+            ),
+            { signal: AbortSignal.timeout(3000) },
           );
-      } catch {
-        inferenceAvailable = false;
+          const body: unknown = await response.json();
+          inferenceAvailable =
+            response.ok &&
+            typeof body === "object" &&
+            body !== null &&
+            "models" in body &&
+            Array.isArray(body.models) &&
+            body.models.some(
+              (item: unknown) =>
+                typeof item === "object" &&
+                item !== null &&
+                "name" in item &&
+                typeof item.name === "string" &&
+                (item.name === model || item.name.includes("qwen")),
+            );
+        } catch {
+          inferenceAvailable = false;
+        }
       }
+
       return {
         storageAvailable: app.metadataDb !== null,
         analysisAvailable: app.metadataDb !== null,

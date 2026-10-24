@@ -190,6 +190,24 @@ export class FileStore {
         row.method !== "extractive"
       )
         throw new Error("Unrecognized file analysis method.");
+      const result =
+        row.result.answer.status === "answered"
+          ? {
+              ...row.result,
+              answer: {
+                ...row.result.answer,
+                answerText: row.result.answer.answerText.slice(0, 4096),
+                definition: row.result.answer.definition.slice(0, 4096),
+              },
+            }
+          : {
+              ...row.result,
+              answer: {
+                ...row.result.answer,
+                reason: row.result.answer.reason.slice(0, 4096),
+                nextAction: row.result.answer.nextAction.slice(0, 4096),
+              },
+            };
       return {
         id: row.id,
         fileId: row.fileId,
@@ -197,7 +215,7 @@ export class FileStore {
         sourceHash: row.sourceHash,
         modelVersion: row.modelVersion,
         method: row.method,
-        result: row.result,
+        result,
         createdAt: row.createdAt.toISOString(),
       };
     });

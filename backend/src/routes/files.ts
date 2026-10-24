@@ -12,11 +12,11 @@ import {
 import { ErrorSchema, IdSchema } from "../contracts/common.js";
 import { requireAuth } from "../security/auth.js";
 import { isSubjectRevoked } from "../security/policies.js";
-import { OllamaInferenceClient } from "../inference/client.js";
+import { createInferenceClient } from "../inference/client.js";
 
 export const fileRoutes: FastifyPluginAsyncTypebox = async (app) => {
   const store = app.metadataDb
-    ? new FileStore(app.metadataDb, new OllamaInferenceClient())
+    ? new FileStore(app.metadataDb, createInferenceClient())
     : null;
   const active = new Map<string, number>();
   app.addHook("preHandler", requireAuth);
@@ -48,6 +48,8 @@ export const fileRoutes: FastifyPluginAsyncTypebox = async (app) => {
       });
     app.log.error(
       {
+        errorMessage: error instanceof Error ? error.message : String(error),
+        errorStack: error instanceof Error ? error.stack : undefined,
         code:
           typeof error === "object" &&
           error !== null &&

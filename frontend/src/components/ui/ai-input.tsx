@@ -97,10 +97,10 @@ export function AIInput({
             </span>
             <span
               className="local-model"
-              title="Local Qwen2.5-Coder plans supported file questions; values are calculated from stored records."
+              title="NVIDIA Nemotron 3.5 Lightning plans supported file questions; values are calculated from stored records."
             >
-              <span className="model-indicator" /> Qwen 2.5{" "}
-              <span className="model-local">Local</span>
+              <span className="model-indicator" /> Nemotron 3.5{" "}
+              <span className="model-local">NVIDIA</span>
             </span>
             <button
               type="submit"
