@@ -224,9 +224,9 @@ export class AnalysisOrchestrator {
         .where(
           workspaceId
             ? and(
-                eq(analysisRuns.id, runId),
-                eq(analysisRuns.workspaceId, workspaceId),
-              )
+              eq(analysisRuns.id, runId),
+              eq(analysisRuns.workspaceId, workspaceId),
+            )
             : eq(analysisRuns.id, runId),
         );
       const row = rows[0];
@@ -294,9 +294,9 @@ export class AnalysisOrchestrator {
     const candidate =
       state.run.status === "blocked_by_policy" && state.candidate
         ? {
-            ...state.candidate,
-            sqlText: "[REDACTED BLOCKED QUERY]",
-          }
+          ...state.candidate,
+          sqlText: "[REDACTED BLOCKED QUERY]",
+        }
         : state.candidate;
 
     return {
@@ -687,16 +687,16 @@ export class AnalysisOrchestrator {
         parentRunId: input.parentRunId ?? null,
         parentState: parentState
           ? {
-              runId: parentState.run.runId,
-              workspaceId: parentState.workspaceId,
-              connectionId: parentState.connectionId,
-              question: parentState.question,
-              status: parentState.run.status,
-              intent: parentState.intent,
-              plan: parentState.plan,
-              activeContext: parentState.activeContext,
-              assumptions: parentState.assumptions,
-            }
+            runId: parentState.run.runId,
+            workspaceId: parentState.workspaceId,
+            connectionId: parentState.connectionId,
+            question: parentState.question,
+            status: parentState.run.status,
+            intent: parentState.intent,
+            plan: parentState.plan,
+            activeContext: parentState.activeContext,
+            assumptions: parentState.assumptions,
+          }
           : null,
         currentWorkspaceId: input.workspaceId,
         connectionId: input.connectionId,
@@ -800,7 +800,7 @@ export class AnalysisOrchestrator {
           const now = new Date();
           const expiresAt = new Date(
             now.getTime() +
-              foundationPolicy.retention.schemaSnapshotDays * 86400000,
+            foundationPolicy.retention.schemaSnapshotDays * 86400000,
           );
           await this.metadataDb
             .insert(schemaSnapshots)
