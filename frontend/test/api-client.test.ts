@@ -21,6 +21,7 @@ import {
   getExportUrl,
   getEffectivePolicy,
   simulatePolicy,
+  getRunContext,
   type ConnectionInput,
 } from "../src/lib/api-client";
 
@@ -385,4 +386,93 @@ it("supports effective policy inspection and policy simulation", async () => {
   });
   expect(sim.allowed).toBe(false);
   expect(sim.violations).toContain("direct_sql_not_permitted");
+});
+
+it("supports conversation context and delta retrieval", async () => {
+  const fetchMock = vi.fn().mockResolvedValueOnce(
+    Response.json({
+      runId: "r2",
+      parentRunId: "r1",
+      rootRunId: "r1",
+      turnNumber: 2,
+      activeContext: {
+        connectionId: "c1",
+        sources: ["analytics_clean.enrolments"],
+        metric: "enrolment_decline",
+        grain: ["school_id"],
+        timeRange: { start: "2022", end: "2023", semantics: "calendar_year" },
+        filters: [],
+        confirmedAssumptions: [],
+      },
+      delta: {
+        changedFields: ["timeRange"],
+        previousValues: { timeRange: { start: "2024", end: "2025" } },
+        newValues: { timeRange: { start: "2022", end: "2023" } },
+        changeType: "refinement",
+        explanation: "Constrained time range to 2023",
+      },
+      turns: [
+        {
+          turnNumber: 1,
+          runId: "r1",
+          parentRunId: null,
+          question: "Initial question",
+          status: "answered",
+          activeContext: {
+            connectionId: "c1",
+            sources: ["analytics_clean.enrolments"],
+            metric: "enrolment_decline",
+            grain: ["school_id"],
+            timeRange: null,
+            filters: [],
+            confirmedAssumptions: [],
+          },
+          delta: {
+            changedFields: [],
+            previousValues: {},
+            newValues: {},
+            changeType: "initial",
+            explanation: "Initial turn",
+          },
+          createdAt: new Date().toISOString(),
+        },
+        {
+          turnNumber: 2,
+          runId: "r2",
+          parentRunId: "r1",
+          question: "Now for 2023",
+          status: "answered",
+          activeContext: {
+            connectionId: "c1",
+            sources: ["analytics_clean.enrolments"],
+            metric: "enrolment_decline",
+            grain: ["school_id"],
+            timeRange: {
+              start: "2022",
+              end: "2023",
+              semantics: "calendar_year",
+            },
+            filters: [],
+            confirmedAssumptions: [],
+          },
+          delta: {
+            changedFields: ["timeRange"],
+            previousValues: { timeRange: { start: "2024", end: "2025" } },
+            newValues: { timeRange: { start: "2022", end: "2023" } },
+            changeType: "refinement",
+            explanation: "Constrained time range to 2023",
+          },
+          createdAt: new Date().toISOString(),
+        },
+      ],
+    }),
+  );
+
+  vi.stubGlobal("fetch", fetchMock);
+
+  const context = await getRunContext("r2");
+  expect(context.runId).toBe("r2");
+  expect(context.turnNumber).toBe(2);
+  expect(context.delta.changeType).toBe("refinement");
+  expect(context.turns).toHaveLength(2);
 });

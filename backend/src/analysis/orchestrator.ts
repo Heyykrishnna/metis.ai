@@ -4,8 +4,11 @@ import { and, eq } from "drizzle-orm";
 import type { Static } from "typebox";
 import {
   terminalStatuses,
+  type ActiveContext,
   type AnalyticalPlan,
   type AnswerEnvelope,
+  type ContextDelta,
+  type ConversationContextResponse,
   type EvidenceBundleSchema,
   type ExecutionRecordSchema,
   type QuestionIntent,
@@ -15,6 +18,12 @@ import {
   type RunStatus,
   type SqlCandidateSchema,
 } from "../contracts/analysis.js";
+import {
+  getConversationContext,
+  getConversationTurn,
+  recordConversationTurn,
+  resolveConversationalFollowUp,
+} from "./conversations.js";
 import { canTransition } from "../contracts/lifecycle.js";
 import type { MetadataDatabase } from "../db/index.js";
 import {
@@ -137,6 +146,8 @@ interface StoredRunState {
   resultColumns: string[];
   exclusions: string[];
   assumptions: string[];
+  activeContext?: ActiveContext;
+  delta?: ContextDelta;
   abortController: AbortController;
 }
 
@@ -368,6 +379,13 @@ export class AnalysisOrchestrator {
     };
   }
 
+  getConversationContext(
+    runId: string,
+    workspaceId: string,
+  ): ConversationContextResponse | null {
+    return getConversationContext(runId, workspaceId);
+  }
+
   async cancelRun(runId: string, workspaceId?: string): Promise<Run> {
     const state = this.activeRuns.get(runId);
     if (!state || (workspaceId && state.workspaceId !== workspaceId)) {
@@ -393,6 +411,23 @@ export class AnalysisOrchestrator {
   }
 
   private async persistRun(state: StoredRunState): Promise<void> {
+    if (state.activeContext && state.delta) {
+      recordConversationTurn(
+        {
+          turnNumber:
+            (getConversationTurn(state.parentRunId ?? "")?.turnNumber ?? 0) + 1,
+          runId: state.run.runId,
+          parentRunId: state.parentRunId,
+          question: state.question,
+          status: state.run.status as TerminalStatus,
+          activeContext: state.activeContext,
+          delta: state.delta,
+          createdAt: state.run.startedAt,
+        },
+        state.workspaceId,
+      );
+    }
+
     if (!this.metadataDb) {
       return;
     }
@@ -631,20 +666,82 @@ export class AnalysisOrchestrator {
         return state.run;
       }
 
-      const qLower = input.question.toLowerCase();
-      if (
-        ((qLower.includes("01/02/2025") && qLower.includes("02/01/2025")) ||
-          qLower.includes("calendar or academic")) &&
-        !input.parentRunId
-      ) {
+      const parentState = input.parentRunId
+        ? (this.activeRuns.get(input.parentRunId) ?? null)
+        : null;
+
+      const resolution = resolveConversationalFollowUp({
+        question: input.question,
+        runId,
+        parentRunId: input.parentRunId ?? null,
+        parentState: parentState
+          ? {
+              runId: parentState.run.runId,
+              workspaceId: parentState.workspaceId,
+              connectionId: parentState.connectionId,
+              question: parentState.question,
+              status: parentState.run.status,
+              intent: parentState.intent,
+              plan: parentState.plan,
+              activeContext: parentState.activeContext,
+              assumptions: parentState.assumptions,
+            }
+          : null,
+        currentWorkspaceId: input.workspaceId,
+        connectionId: input.connectionId,
+        allowedSchemas: input.allowedSchemas,
+        role: input.role,
+        actorSubject: input.actorSubject,
+        sqlOverride: input.sqlOverride,
+        isRecipe: input.isRecipe,
+      });
+
+      state.activeContext = resolution.activeContext;
+      state.delta = resolution.delta;
+
+      if (resolution.status === "blocked_by_policy") {
+        this.emitProgress(state, "blocked_by_policy");
+        state.run.completedAt = new Date().toISOString();
+        state.answer = {
+          runId,
+          status: "blocked_by_policy",
+          reason: resolution.reason ?? "Blocked by security policy",
+          nextAction: resolution.nextAction ?? "Request authorization",
+          assumptions: [],
+          limitations: [],
+        };
+        await this.persistRun(state);
+        return state.run;
+      }
+
+      if (resolution.status === "needs_clarification") {
         this.emitProgress(state, "needs_clarification");
         state.run.completedAt = new Date().toISOString();
         state.answer = {
           runId,
           status: "needs_clarification",
-          reason: "Ambiguous date or period format requires clarification",
+          reason:
+            resolution.reason ?? "Ambiguous request requires clarification",
+          nextAction: resolution.nextAction ?? "Clarify request parameters",
+          assumptions: [],
+          limitations: [],
+        };
+        await this.persistRun(state);
+        return state.run;
+      }
+
+      if (resolution.status === "abstained") {
+        this.emitProgress(state, "abstained");
+        state.run.completedAt = new Date().toISOString();
+        state.answer = {
+          runId,
+          status: "abstained",
+          reason:
+            resolution.reason ??
+            "Required observation period or field is missing in database",
           nextAction:
-            "Specify date format (DD/MM/YYYY or MM/DD/YYYY) or calendar vs academic year",
+            resolution.nextAction ??
+            "Verify that data contains the requested period",
           assumptions: [],
           limitations: [],
         };
@@ -658,17 +755,7 @@ export class AnalysisOrchestrator {
         );
       }
 
-      state.intent = {
-        question: input.question,
-        entities: ["schools"],
-        measures: ["enrolled"],
-        dimensions: ["school_id", "year"],
-        filters: [],
-        timeRange: { start: "2024", end: "2025", semantics: "calendar_year" },
-        comparison: "2025 vs 2024",
-        grain: ["school_id"],
-        ambiguityFlags: [],
-      };
+      state.intent = resolution.intent;
 
       this.emitProgress(state, "retrieving");
       if (checkAbort()) return state.run;
@@ -710,54 +797,10 @@ export class AnalysisOrchestrator {
       this.emitProgress(state, "grounding");
       if (checkAbort()) return state.run;
 
-      if (
-        qLower.includes("2010") ||
-        qLower.includes("fiscal year") ||
-        qLower.includes("missing")
-      ) {
-        this.emitProgress(state, "abstained");
-        state.run.completedAt = new Date().toISOString();
-        state.answer = {
-          runId,
-          status: "abstained",
-          reason: "Required observation period or field is missing in database",
-          nextAction: "Verify that data contains the requested period",
-          assumptions: [],
-          limitations: [],
-        };
-        await this.persistRun(state);
-        return state.run;
-      }
-
       this.emitProgress(state, "planning");
       if (checkAbort()) return state.run;
 
-      state.plan = {
-        sources: ["analytics_clean.enrolments"],
-        joinEdges: [
-          {
-            left: "analytics_clean.enrolments (current)",
-            right: "analytics_clean.enrolments (previous)",
-            relationshipEvidence: ["school_id = school_id"],
-          },
-        ],
-        predicates: [
-          "current.year = 2025",
-          "previous.year = 2024",
-          "current.enrolled < previous.enrolled",
-        ],
-        aggregations: [],
-        grain: ["school_id"],
-        nullPolicy:
-          "Exclude schools with null or missing enrolment in either year",
-        assumptions: ["Observations represent calendar year enrolments"],
-        verificationPlan: [
-          "check-shape",
-          "check-grain",
-          "check-null-policy",
-          "check-coverage",
-        ],
-      };
+      state.plan = resolution.plan;
       state.assumptions = Array.from(
         new Set([...state.assumptions, ...state.plan.assumptions]),
       );
@@ -767,21 +810,13 @@ export class AnalysisOrchestrator {
       if (checkAbort()) return state.run;
 
       const candidateId = randomUUID();
-      const generatedSql =
-        input.sqlOverride ??
-        `SELECT current.school_id, current.enrolled - previous.enrolled AS delta
-FROM analytics_clean.enrolments current
-JOIN analytics_clean.enrolments previous ON current.school_id = previous.school_id
-WHERE current.year = 2025 AND previous.year = 2024
-  AND current.enrolled IS NOT NULL AND previous.enrolled IS NOT NULL
-  AND current.enrolled < previous.enrolled
-ORDER BY current.school_id;`;
+      const generatedSql = input.sqlOverride ?? resolution.sqlText;
 
       state.candidate = {
         candidateId,
         dialect: "PostgreSQL",
         sqlText: generatedSql,
-        referencedObjects: ["analytics_clean.enrolments"],
+        referencedObjects: resolution.activeContext.sources,
         parameterDefinitions: [],
       };
 

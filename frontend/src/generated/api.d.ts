@@ -194,6 +194,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/runs/{runId}/context": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                runId: string;
+            };
+            cookie?: never;
+        };
+        get: operations["getRunContext"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/runs/{runId}/export/csv": {
         parameters: {
             query?: never;
@@ -1155,6 +1173,78 @@ export interface components {
             effectiveColumns: string[];
             reason?: string;
         };
+        ConversationContextResponse: {
+            runId: string;
+            parentRunId: string | null;
+            rootRunId: string;
+            turnNumber: number;
+            activeContext: {
+                connectionId: string;
+                sources: string[];
+                metric: string;
+                grain: string[];
+                timeRange: {
+                    start: string;
+                    end: string;
+                    semantics: string;
+                } | null;
+                filters: {
+                    field: string;
+                    operator: string;
+                    values: (string | number | boolean | null)[];
+                }[];
+                confirmedAssumptions: string[];
+            };
+            delta: {
+                changedFields: string[];
+                previousValues: {
+                    [key: string]: unknown;
+                };
+                newValues: {
+                    [key: string]: unknown;
+                };
+                changeType: "initial" | "refinement" | "branch" | "reset" | "clarification";
+                explanation: string;
+            };
+            turns: {
+                turnNumber: number;
+                runId: string;
+                parentRunId: string | null;
+                question: string;
+                /** @enum {unknown} */
+                status: "answered" | "needs_clarification" | "abstained" | "blocked_by_policy" | "execution_failed" | "timed_out" | "cancelled";
+                activeContext: {
+                    connectionId: string;
+                    sources: string[];
+                    metric: string;
+                    grain: string[];
+                    timeRange: {
+                        start: string;
+                        end: string;
+                        semantics: string;
+                    } | null;
+                    filters: {
+                        field: string;
+                        operator: string;
+                        values: (string | number | boolean | null)[];
+                    }[];
+                    confirmedAssumptions: string[];
+                };
+                delta: {
+                    changedFields: string[];
+                    previousValues: {
+                        [key: string]: unknown;
+                    };
+                    newValues: {
+                        [key: string]: unknown;
+                    };
+                    changeType: "initial" | "refinement" | "branch" | "reset" | "clarification";
+                    explanation: string;
+                };
+                /** Format: date-time */
+                createdAt: string;
+            }[];
+        };
     };
     responses: never;
     parameters: never;
@@ -2015,6 +2105,82 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EvidenceBundle"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Access denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Resource unavailable */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Resource limit reached */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Dependency unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getRunContext: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                runId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationContextResponse"];
                 };
             };
             /** @description Invalid request */

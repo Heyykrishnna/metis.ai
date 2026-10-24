@@ -106,7 +106,12 @@ export interface PolicyEvaluationResult {
 interface ColumnCollectorState {
   columns: Set<string>;
   aggregates: Set<string>;
-  whereExpressions: Array<{ left: string; op: string; right: string | number }>;
+  whereExpressions: Array<{
+    left: string;
+    op: string;
+    right: string | number;
+    isColumnComparison?: boolean;
+  }>;
   havingExpressions: Array<{
     left: string;
     op: string;
@@ -152,6 +157,14 @@ function extractBinaryOperand(val: unknown): string {
   return "";
 }
 
+function isColumnReferenceNode(val: unknown): boolean {
+  if (val !== null && typeof val === "object") {
+    const obj = val as Record<string, unknown>;
+    return obj.type === "column_ref";
+  }
+  return false;
+}
+
 function traverseAstForPolicy(
   node: unknown,
   state: ColumnCollectorState,
@@ -184,11 +197,14 @@ function traverseAstForPolicy(
     const leftStr = extractBinaryOperand(record.left);
     const opStr = typeof record.operator === "string" ? record.operator : "";
     const rightStr = extractBinaryOperand(record.right);
+    const isColumnComparison =
+      isColumnReferenceNode(record.left) && isColumnReferenceNode(record.right);
     if (leftStr && opStr) {
       state.whereExpressions.push({
         left: leftStr.toLowerCase(),
         op: opStr.toUpperCase(),
         right: rightStr,
+        isColumnComparison,
       });
     }
   }
@@ -315,6 +331,9 @@ export function evaluatePolicyCompliance(
 
   let hasSmallCohortRisk = false;
   for (const expr of state.whereExpressions) {
+    if (expr.isColumnComparison) {
+      continue;
+    }
     if (
       expr.left === "school_id" ||
       expr.left === "student_id" ||

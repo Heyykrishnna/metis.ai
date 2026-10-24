@@ -14,6 +14,7 @@ import {
   TruthLedgerSchema,
   ReproducibilityBundleSchema,
   VerificationReportSchema,
+  ConversationContextResponseSchema,
 } from "./analysis.js";
 import { ErrorSchema, HealthSchema, IdSchema } from "./common.js";
 import {
@@ -74,6 +75,7 @@ const apiSchemas = {
   EffectivePolicy: EffectivePolicySchema,
   PolicySimulateInput: PolicySimulateInputSchema,
   PolicySimulateResult: PolicySimulateResultSchema,
+  ConversationContextResponse: ConversationContextResponseSchema,
 };
 function ref(name: keyof typeof apiSchemas) {
   return Type.Ref(`#/components/schemas/${name}`);
@@ -201,6 +203,10 @@ export const openApiDocument = {
     "/v1/runs/{runId}/evidence": {
       parameters: runParameters,
       get: operation("getRunEvidence", ref("EvidenceBundle")),
+    },
+    "/v1/runs/{runId}/context": {
+      parameters: runParameters,
+      get: operation("getRunContext", ref("ConversationContextResponse")),
     },
     "/v1/runs/{runId}/export/csv": {
       parameters: runParameters,

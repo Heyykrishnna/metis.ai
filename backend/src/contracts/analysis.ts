@@ -379,3 +379,87 @@ export const ReproducibilityBundleSchema = Type.Object(
 
 export type TruthLedger = Static<typeof TruthLedgerSchema>;
 export type ReproducibilityBundle = Static<typeof ReproducibilityBundleSchema>;
+
+export const ActiveContextSchema = Type.Object(
+  {
+    connectionId: IdSchema,
+    sources: Type.Array(TextSchema, { maxItems: 50 }),
+    metric: TextSchema,
+    grain: Type.Array(TextSchema, { maxItems: 20 }),
+    timeRange: Type.Union([
+      Type.Object(
+        {
+          start: TextSchema,
+          end: TextSchema,
+          semantics: TextSchema,
+        },
+        { additionalProperties: false },
+      ),
+      Type.Null(),
+    ]),
+    filters: Type.Array(
+      Type.Object(
+        {
+          field: TextSchema,
+          operator: TextSchema,
+          values: Type.Array(ScalarSchema, { maxItems: 100 }),
+        },
+        { additionalProperties: false },
+      ),
+      { maxItems: 50 },
+    ),
+    confirmedAssumptions: Type.Array(TextSchema, { maxItems: 50 }),
+  },
+  { additionalProperties: false },
+);
+
+export const ContextDeltaSchema = Type.Object(
+  {
+    changedFields: Type.Array(TextSchema, { maxItems: 20 }),
+    previousValues: Type.Record(TextSchema, Type.Any()),
+    newValues: Type.Record(TextSchema, Type.Any()),
+    changeType: Type.Union([
+      Type.Literal("initial"),
+      Type.Literal("refinement"),
+      Type.Literal("branch"),
+      Type.Literal("reset"),
+      Type.Literal("clarification"),
+    ]),
+    explanation: TextSchema,
+  },
+  { additionalProperties: false },
+);
+
+export const ConversationTurnSchema = Type.Object(
+  {
+    turnNumber: Type.Integer({ minimum: 1 }),
+    runId: IdSchema,
+    parentRunId: Type.Union([IdSchema, Type.Null()]),
+    question: TextSchema,
+    status: TerminalStatusSchema,
+    activeContext: ActiveContextSchema,
+    delta: ContextDeltaSchema,
+    createdAt: TimestampSchema,
+  },
+  { additionalProperties: false },
+);
+
+export const ConversationContextResponseSchema = Type.Object(
+  {
+    runId: IdSchema,
+    parentRunId: Type.Union([IdSchema, Type.Null()]),
+    rootRunId: IdSchema,
+    turnNumber: Type.Integer({ minimum: 1 }),
+    activeContext: ActiveContextSchema,
+    delta: ContextDeltaSchema,
+    turns: Type.Array(ConversationTurnSchema, { maxItems: 100 }),
+  },
+  { additionalProperties: false },
+);
+
+export type ActiveContext = Static<typeof ActiveContextSchema>;
+export type ContextDelta = Static<typeof ContextDeltaSchema>;
+export type ConversationTurn = Static<typeof ConversationTurnSchema>;
+export type ConversationContextResponse = Static<
+  typeof ConversationContextResponseSchema
+>;

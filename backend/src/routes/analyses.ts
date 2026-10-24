@@ -7,6 +7,7 @@ import {
   RunSchema,
   SubmitAnalysisSchema,
   TruthLedgerSchema,
+  ConversationContextResponseSchema,
 } from "../contracts/analysis.js";
 import { ErrorSchema, IdSchema, TextSchema } from "../contracts/common.js";
 import {
@@ -282,6 +283,52 @@ export const analysisRoutes: FastifyPluginAsyncTypebox = async (app) => {
           requestId,
         });
       }
+    },
+  );
+
+  app.get(
+    "/v1/runs/:runId/context",
+    {
+      schema: {
+        params: runParamsSchema,
+        response: {
+          200: ConversationContextResponseSchema,
+          403: ErrorSchema,
+          404: ErrorSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const { runId } = request.params as { runId: string };
+      const workspaceId =
+        request.authContext?.workspaceId ??
+        "00000000-0000-4000-8000-000000000001";
+      const requestId = request.id ?? "req-unknown";
+
+      if (
+        request.authContext?.subject &&
+        isSubjectRevoked(request.authContext.subject)
+      ) {
+        return reply.status(403).send({
+          code: "forbidden",
+          message: "Subject authorization revoked",
+          requestId,
+        });
+      }
+
+      const context = app.orchestrator.getConversationContext(
+        runId,
+        workspaceId,
+      );
+      if (!context) {
+        return reply.status(404).send({
+          code: "not_found",
+          message: "Conversation context unavailable",
+          requestId,
+        });
+      }
+
+      return reply.send(context);
     },
   );
 
