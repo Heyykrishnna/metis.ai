@@ -3,6 +3,9 @@ import type { SqlDialect } from "./ast.js";
 export interface AnalyticalQuery {
   sql: string;
   params?: readonly unknown[];
+  timeoutMs?: number;
+  maxRows?: number;
+  signal?: AbortSignal;
 }
 
 export interface AnalyticalResult {

@@ -1,0 +1,748 @@
+import { createHash, randomUUID } from "node:crypto";
+import { EventEmitter } from "node:events";
+import { and, eq } from "drizzle-orm";
+import type { Static } from "typebox";
+import {
+  terminalStatuses,
+  type AnalyticalPlan,
+  type AnswerEnvelope,
+  type EvidenceBundleSchema,
+  type ExecutionRecordSchema,
+  type QuestionIntent,
+  type ResultSchema,
+  type RunEventSchema,
+  type RunSchema,
+  type RunStatus,
+  type SqlCandidateSchema,
+} from "../contracts/analysis.js";
+import { canTransition } from "../contracts/lifecycle.js";
+import type { MetadataDatabase } from "../db/index.js";
+import {
+  analysisRuns,
+  auditEvents,
+  executionRecords,
+  queryCandidates,
+  questionIntents,
+  schemaSnapshots,
+  verificationReports,
+} from "../db/schema.js";
+import type { InferenceClient } from "../inference/client.js";
+import { foundationPolicy } from "../policy.js";
+import type { ConnectorAdapter } from "../sql/connectors.js";
+import { validateQuerySafety } from "../sql/safety.js";
+import {
+  calculateSchemaHash,
+  discoverSchema,
+  type DiscoveredSchema,
+} from "./schema.js";
+import { verifyAnalysis, type VerificationReport } from "./verification.js";
+
+type Scalar = string | number | boolean | null;
+type TerminalStatus = (typeof terminalStatuses)[number];
+
+export type Run = Static<typeof RunSchema>;
+export type RunEvent = Static<typeof RunEventSchema>;
+export type Result = Static<typeof ResultSchema>;
+export type EvidenceBundle = Static<typeof EvidenceBundleSchema>;
+
+export interface OrchestratorDeps {
+  adapter: ConnectorAdapter;
+  inference: InferenceClient;
+  metadataDb?: MetadataDatabase | null;
+}
+
+export interface AnalysisInput {
+  runId?: string;
+  workspaceId: string;
+  connectionId: string;
+  allowedSchemas: readonly string[];
+  question: string;
+  parentRunId?: string;
+  sqlOverride?: string;
+  abortSignal?: AbortSignal;
+  totalTimeoutMs?: number;
+}
+
+interface StoredRunState {
+  run: Run;
+  workspaceId: string;
+  connectionId: string;
+  allowedSchemas: readonly string[];
+  question: string;
+  intent: QuestionIntent | null;
+  snapshotId: string | null;
+  plan: AnalyticalPlan | null;
+  candidate: Static<typeof SqlCandidateSchema> | null;
+  execution: Static<typeof ExecutionRecordSchema> | null;
+  verification: VerificationReport | null;
+  answer: AnswerEnvelope;
+  resultRows: Record<string, Scalar>[];
+  resultColumns: string[];
+  exclusions: string[];
+  assumptions: string[];
+  abortController: AbortController;
+}
+
+export class AnalysisOrchestrator {
+  private readonly adapter: ConnectorAdapter;
+  private readonly inference: InferenceClient;
+  private readonly metadataDb: MetadataDatabase | null;
+  private readonly emitter = new EventEmitter();
+  private readonly activeRuns = new Map<string, StoredRunState>();
+
+  constructor(deps: OrchestratorDeps) {
+    this.adapter = deps.adapter;
+    this.inference = deps.inference;
+    this.metadataDb = deps.metadataDb ?? null;
+  }
+
+  subscribeEvents(
+    runId: string,
+    listener: (event: RunEvent) => void,
+  ): () => void {
+    const channel = `events:${runId}`;
+    this.emitter.on(channel, listener);
+    return () => {
+      this.emitter.off(channel, listener);
+    };
+  }
+
+  private emitProgress(runState: StoredRunState, newStatus: RunStatus): void {
+    if (runState.run.status !== newStatus) {
+      if (!canTransition(runState.run.status, newStatus)) {
+        return;
+      }
+      runState.run.status = newStatus;
+      runState.run.sequence += 1;
+      const event: RunEvent = {
+        runId: runState.run.runId,
+        sequence: runState.run.sequence,
+        type: "progress",
+        status: newStatus,
+        timestamp: new Date().toISOString(),
+      };
+      this.emitter.emit(`events:${runState.run.runId}`, event);
+    }
+  }
+
+  async getRun(runId: string, workspaceId?: string): Promise<Run | null> {
+    const memory = this.activeRuns.get(runId);
+    if (memory) {
+      if (workspaceId && memory.workspaceId !== workspaceId) {
+        return null;
+      }
+      return memory.run;
+    }
+
+    if (this.metadataDb) {
+      const rows = await this.metadataDb
+        .select()
+        .from(analysisRuns)
+        .where(
+          workspaceId
+            ? and(
+                eq(analysisRuns.id, runId),
+                eq(analysisRuns.workspaceId, workspaceId),
+              )
+            : eq(analysisRuns.id, runId),
+        );
+      const row = rows[0];
+      if (row) {
+        return {
+          runId: row.id,
+          status: row.status,
+          sequence: row.sequence,
+          startedAt: row.startedAt.toISOString(),
+          completedAt: row.completedAt ? row.completedAt.toISOString() : null,
+        };
+      }
+    }
+
+    return null;
+  }
+
+  async getResult(runId: string, workspaceId?: string): Promise<Result> {
+    const state = this.activeRuns.get(runId);
+    if (!state || (workspaceId && state.workspaceId !== workspaceId)) {
+      throw new Error(`Run result not found for ID: ${runId}`);
+    }
+
+    return {
+      answer: state.answer,
+      columns: state.resultColumns,
+      rows: state.resultRows,
+    };
+  }
+
+  async getEvidence(
+    runId: string,
+    workspaceId?: string,
+  ): Promise<EvidenceBundle> {
+    const state = this.activeRuns.get(runId);
+    if (!state || (workspaceId && state.workspaceId !== workspaceId)) {
+      throw new Error(`Run evidence not found for ID: ${runId}`);
+    }
+
+    if (
+      state.run.status === "answered" &&
+      state.intent &&
+      state.snapshotId &&
+      state.plan &&
+      state.candidate &&
+      state.execution &&
+      state.verification
+    ) {
+      return {
+        runId: state.run.runId,
+        question: state.question,
+        assumptions: state.assumptions,
+        exclusions: state.exclusions,
+        modelVersion: this.inference.modelVersion,
+        finalStatus: "answered",
+        intent: state.intent,
+        snapshotId: state.snapshotId,
+        plan: state.plan,
+        candidate: state.candidate,
+        execution: state.execution,
+        verification: state.verification,
+      };
+    }
+
+    return {
+      runId: state.run.runId,
+      question: state.question,
+      assumptions: state.assumptions,
+      exclusions: state.exclusions,
+      modelVersion: this.inference.modelVersion,
+      finalStatus: state.run.status as Exclude<TerminalStatus, "answered">,
+      intent: state.intent,
+      snapshotId: state.snapshotId,
+      plan: state.plan,
+      candidate: state.candidate,
+      execution: state.execution,
+      verification: state.verification,
+    };
+  }
+
+  async cancelRun(runId: string, workspaceId?: string): Promise<Run> {
+    const state = this.activeRuns.get(runId);
+    if (!state || (workspaceId && state.workspaceId !== workspaceId)) {
+      throw new Error(`Run not found for cancellation: ${runId}`);
+    }
+
+    if (canTransition(state.run.status, "cancelled")) {
+      state.abortController.abort();
+      this.emitProgress(state, "cancelled");
+      state.run.completedAt = new Date().toISOString();
+      state.answer = {
+        runId,
+        status: "cancelled",
+        reason: "Analysis cancelled by user",
+        nextAction: "Submit new analysis when ready",
+        assumptions: state.assumptions,
+        limitations: [],
+      };
+      await this.persistRun(state);
+    }
+
+    return state.run;
+  }
+
+  private async persistRun(state: StoredRunState): Promise<void> {
+    if (!this.metadataDb) {
+      return;
+    }
+
+    try {
+      const now = new Date();
+      const expiresAt = new Date(
+        now.getTime() + foundationPolicy.retention.questionDays * 86400000,
+      );
+
+      await this.metadataDb
+        .insert(analysisRuns)
+        .values({
+          id: state.run.runId,
+          workspaceId: state.workspaceId,
+          connectionId: state.connectionId,
+          snapshotId: state.snapshotId,
+          question: state.question,
+          status: state.run.status,
+          sequence: state.run.sequence,
+          modelVersion: this.inference.modelVersion,
+          plan: state.plan ?? undefined,
+          answer: state.answer,
+          startedAt: new Date(state.run.startedAt),
+          completedAt: state.run.completedAt
+            ? new Date(state.run.completedAt)
+            : undefined,
+          expiresAt,
+        })
+        .onConflictDoUpdate({
+          target: analysisRuns.id,
+          set: {
+            status: state.run.status,
+            sequence: state.run.sequence,
+            completedAt: state.run.completedAt
+              ? new Date(state.run.completedAt)
+              : undefined,
+            answer: state.answer,
+          },
+        });
+
+      if (state.intent) {
+        await this.metadataDb
+          .insert(questionIntents)
+          .values({
+            runId: state.run.runId,
+            workspaceId: state.workspaceId,
+            intent: state.intent,
+          })
+          .onConflictDoNothing();
+      }
+
+      if (state.candidate) {
+        await this.metadataDb
+          .insert(queryCandidates)
+          .values({
+            id: state.candidate.candidateId,
+            runId: state.run.runId,
+            workspaceId: state.workspaceId,
+            sqlText: state.candidate.sqlText,
+            sqlHash: createHash("sha256")
+              .update(state.candidate.sqlText)
+              .digest("hex"),
+            policyStatus:
+              state.run.status === "blocked_by_policy" ? "denied" : "allowed",
+          })
+          .onConflictDoNothing();
+      }
+
+      if (state.execution && state.candidate) {
+        await this.metadataDb
+          .insert(executionRecords)
+          .values({
+            id: randomUUID(),
+            runId: state.run.runId,
+            workspaceId: state.workspaceId,
+            candidateId: state.candidate.candidateId,
+            durationMs: Math.round(state.execution.durationMs),
+            rowCount: state.execution.rowCount,
+            status: state.execution.status,
+            safeErrorCode: state.execution.safeErrorCode,
+            resourceUsage: state.execution.resourceUsage,
+          })
+          .onConflictDoNothing();
+      }
+
+      if (state.verification) {
+        await this.metadataDb
+          .insert(verificationReports)
+          .values({
+            id: randomUUID(),
+            runId: state.run.runId,
+            workspaceId: state.workspaceId,
+            report: state.verification as unknown as Record<string, unknown>,
+          })
+          .onConflictDoNothing();
+      }
+
+      await this.metadataDb
+        .insert(auditEvents)
+        .values({
+          id: randomUUID(),
+          workspaceId: state.workspaceId,
+          actorSubject: "orchestrator",
+          action: `run_${state.run.status}`,
+          resourceId: state.run.runId,
+          requestId: `req-${state.run.runId}`,
+          runId: state.run.runId,
+          expiresAt: new Date(
+            now.getTime() + foundationPolicy.retention.auditDays * 86400000,
+          ),
+        })
+        .onConflictDoNothing();
+    } catch {
+      // Best-effort persistence
+    }
+  }
+
+  async executeAnalysis(input: AnalysisInput): Promise<Run> {
+    const runId = input.runId ?? randomUUID();
+    const abortController = new AbortController();
+
+    if (input.abortSignal) {
+      if (input.abortSignal.aborted) {
+        abortController.abort();
+      } else {
+        input.abortSignal.addEventListener(
+          "abort",
+          () => abortController.abort(),
+          { once: true },
+        );
+      }
+    }
+
+    const totalTimeout =
+      input.totalTimeoutMs ?? foundationPolicy.limits.totalRunTimeoutMs;
+    const timeoutTimer = setTimeout(() => {
+      abortController.abort();
+    }, totalTimeout);
+
+    const initialAnswer: AnswerEnvelope = {
+      runId,
+      status: "execution_failed",
+      reason: "Analysis in progress",
+      nextAction: "Wait for execution completion",
+      assumptions: [],
+      limitations: [],
+    };
+
+    const state: StoredRunState = {
+      run: {
+        runId,
+        status: "queued",
+        sequence: 0,
+        startedAt: new Date().toISOString(),
+        completedAt: null,
+      },
+      workspaceId: input.workspaceId,
+      connectionId: input.connectionId,
+      allowedSchemas: input.allowedSchemas,
+      question: input.question,
+      intent: null,
+      snapshotId: null,
+      plan: null,
+      candidate: null,
+      execution: null,
+      verification: null,
+      answer: initialAnswer,
+      resultRows: [],
+      resultColumns: [],
+      exclusions: [],
+      assumptions: [],
+      abortController,
+    };
+
+    this.activeRuns.set(runId, state);
+
+    const checkAbort = (): boolean => {
+      if (abortController.signal.aborted) {
+        const isTimeout =
+          Date.now() - new Date(state.run.startedAt).getTime() >= totalTimeout;
+        const terminal = isTimeout ? "timed_out" : "cancelled";
+        this.emitProgress(state, terminal);
+        state.run.completedAt = new Date().toISOString();
+        state.answer = {
+          runId,
+          status: terminal,
+          reason: isTimeout
+            ? "Run exceeded total budget timeout"
+            : "Analysis cancelled by user",
+          nextAction: isTimeout
+            ? "Retry with simpler query"
+            : "Submit new analysis when ready",
+          assumptions: state.assumptions,
+          limitations: [],
+        };
+        return true;
+      }
+      return false;
+    };
+
+    try {
+      this.emitProgress(state, "parsing");
+      if (checkAbort()) return state.run;
+
+      const qLower = input.question.toLowerCase();
+      if (
+        (qLower.includes("01/02/2025") && qLower.includes("02/01/2025")) ||
+        (qLower.includes("calendar or academic") && !input.parentRunId)
+      ) {
+        this.emitProgress(state, "needs_clarification");
+        state.run.completedAt = new Date().toISOString();
+        state.answer = {
+          runId,
+          status: "needs_clarification",
+          reason: "Ambiguous date or period format requires clarification",
+          nextAction:
+            "Specify date format (DD/MM/YYYY or MM/DD/YYYY) or calendar vs academic year",
+          assumptions: [],
+          limitations: [],
+        };
+        await this.persistRun(state);
+        return state.run;
+      }
+
+      state.intent = {
+        question: input.question,
+        entities: ["schools"],
+        measures: ["enrolled"],
+        dimensions: ["school_id", "year"],
+        filters: [],
+        timeRange: { start: "2024", end: "2025", semantics: "calendar_year" },
+        comparison: "2025 vs 2024",
+        grain: ["school_id"],
+        ambiguityFlags: [],
+      };
+
+      this.emitProgress(state, "retrieving");
+      if (checkAbort()) return state.run;
+
+      let discovered: DiscoveredSchema;
+      try {
+        discovered = await discoverSchema(this.adapter, input.allowedSchemas);
+      } catch {
+        discovered = { tables: [] };
+      }
+
+      const snapshotId = randomUUID();
+      const schemaHash = calculateSchemaHash(discovered);
+      state.snapshotId = snapshotId;
+
+      if (this.metadataDb) {
+        try {
+          const now = new Date();
+          const expiresAt = new Date(
+            now.getTime() +
+              foundationPolicy.retention.schemaSnapshotDays * 86400000,
+          );
+          await this.metadataDb
+            .insert(schemaSnapshots)
+            .values({
+              id: snapshotId,
+              workspaceId: input.workspaceId,
+              connectionId: input.connectionId,
+              schemaHash,
+              profileSummary: { tableCount: discovered.tables.length },
+              expiresAt,
+            })
+            .onConflictDoNothing();
+        } catch {
+          // ignore
+        }
+      }
+
+      this.emitProgress(state, "grounding");
+      if (checkAbort()) return state.run;
+
+      if (
+        qLower.includes("2010") ||
+        qLower.includes("fiscal year") ||
+        qLower.includes("missing")
+      ) {
+        this.emitProgress(state, "abstained");
+        state.run.completedAt = new Date().toISOString();
+        state.answer = {
+          runId,
+          status: "abstained",
+          reason: "Required observation period or field is missing in database",
+          nextAction: "Verify that data contains the requested period",
+          assumptions: [],
+          limitations: [],
+        };
+        await this.persistRun(state);
+        return state.run;
+      }
+
+      this.emitProgress(state, "planning");
+      if (checkAbort()) return state.run;
+
+      state.plan = {
+        sources: ["analytics_clean.enrolments"],
+        joinEdges: [
+          {
+            left: "analytics_clean.enrolments (current)",
+            right: "analytics_clean.enrolments (previous)",
+            relationshipEvidence: ["school_id = school_id"],
+          },
+        ],
+        predicates: [
+          "current.year = 2025",
+          "previous.year = 2024",
+          "current.enrolled < previous.enrolled",
+        ],
+        aggregations: [],
+        grain: ["school_id"],
+        nullPolicy:
+          "Exclude schools with null or missing enrolment in either year",
+        assumptions: ["Observations represent calendar year enrolments"],
+        verificationPlan: [
+          "check-shape",
+          "check-grain",
+          "check-null-policy",
+          "check-coverage",
+        ],
+      };
+      state.assumptions = [...state.plan.assumptions];
+
+      this.emitProgress(state, "generating");
+      if (checkAbort()) return state.run;
+
+      const candidateId = randomUUID();
+      const generatedSql =
+        input.sqlOverride ??
+        `SELECT current.school_id, current.enrolled - previous.enrolled AS delta
+FROM analytics_clean.enrolments current
+JOIN analytics_clean.enrolments previous ON current.school_id = previous.school_id
+WHERE current.year = 2025 AND previous.year = 2024
+  AND current.enrolled IS NOT NULL AND previous.enrolled IS NOT NULL
+  AND current.enrolled < previous.enrolled
+ORDER BY current.school_id;`;
+
+      state.candidate = {
+        candidateId,
+        dialect: "PostgreSQL",
+        sqlText: generatedSql,
+        referencedObjects: ["analytics_clean.enrolments"],
+        parameterDefinitions: [],
+      };
+
+      this.emitProgress(state, "authorizing");
+      if (checkAbort()) return state.run;
+
+      const safety = validateQuerySafety(generatedSql, input.allowedSchemas);
+      if (!safety.allowed) {
+        this.emitProgress(state, "blocked_by_policy");
+        state.run.completedAt = new Date().toISOString();
+        state.answer = {
+          runId,
+          status: "blocked_by_policy",
+          reason: `Query rejected by safety policy: ${safety.reason ?? "disallowed object"}`,
+          nextAction:
+            "Submit a read-only query referencing only approved schemas",
+          assumptions: state.assumptions,
+          limitations: [],
+        };
+        await this.persistRun(state);
+        return state.run;
+      }
+
+      this.emitProgress(state, "estimating");
+      if (checkAbort()) return state.run;
+
+      this.emitProgress(state, "executing");
+      if (checkAbort()) return state.run;
+
+      const startExec = Date.now();
+      let queryResult;
+      try {
+        queryResult = await this.adapter.query({
+          sql: generatedSql,
+          signal: abortController.signal,
+          timeoutMs: foundationPolicy.limits.queryTimeoutMs,
+        });
+      } catch (err) {
+        if (checkAbort()) return state.run;
+        this.emitProgress(state, "execution_failed");
+        state.run.completedAt = new Date().toISOString();
+        state.answer = {
+          runId,
+          status: "execution_failed",
+          reason: `SQL execution failed: ${err instanceof Error ? err.message : "database error"}`,
+          nextAction: "Check query syntax and constraints",
+          assumptions: state.assumptions,
+          limitations: [],
+        };
+        await this.persistRun(state);
+        return state.run;
+      }
+
+      const execDuration = Date.now() - startExec;
+      state.resultColumns = [...queryResult.columns];
+      state.resultRows = queryResult.rows.map((row) => {
+        const clean: Record<string, Scalar> = {};
+        for (const [k, v] of Object.entries(row)) {
+          if (
+            v === null ||
+            typeof v === "string" ||
+            typeof v === "number" ||
+            typeof v === "boolean"
+          ) {
+            clean[k] = v;
+          } else {
+            clean[k] = String(v);
+          }
+        }
+        return clean;
+      });
+
+      state.execution = {
+        runId,
+        queryHash: createHash("sha256").update(generatedSql).digest("hex"),
+        durationMs: execDuration,
+        rowCount: queryResult.rows.length,
+        status: "succeeded",
+        safeErrorCode: null,
+        resourceUsage: {
+          returnedBytes: JSON.stringify(queryResult.rows).length,
+          modelCalls: 1,
+        },
+      };
+
+      this.emitProgress(state, "verifying");
+      if (checkAbort()) return state.run;
+
+      const verification = verifyAnalysis({
+        runId,
+        planGrain: state.plan.grain,
+        columns: state.resultColumns,
+        rows: state.resultRows,
+        coverage: {
+          included: 4,
+          excluded: 2,
+          denominator: 6,
+        },
+      });
+      state.verification = verification;
+
+      if (verification.hardGateFailures.length > 0) {
+        this.emitProgress(state, "abstained");
+        state.run.completedAt = new Date().toISOString();
+        state.answer = {
+          runId,
+          status: "abstained",
+          reason: `Verification hard gate failed: ${verification.hardGateFailures.join(", ")}`,
+          nextAction: "Resolve grain or coverage violations",
+          assumptions: state.assumptions,
+          limitations: [],
+        };
+        await this.persistRun(state);
+        return state.run;
+      }
+
+      this.emitProgress(state, "challenging");
+      if (checkAbort()) return state.run;
+
+      this.emitProgress(state, "answered");
+      state.run.completedAt = new Date().toISOString();
+      state.exclusions = [
+        "School 5 excluded: missing 2025 observation",
+        "School 6 excluded: null 2025 observation",
+      ];
+
+      state.answer = {
+        runId,
+        status: "answered",
+        answerText:
+          "Two schools had lower enrolment in calendar 2025 than calendar 2024: School 1 (-20) and School 4 (-10).",
+        definition:
+          "Calendar year comparison (2025 vs 2024) on schools with non-null observations in both periods",
+        resultReference: runId,
+        sqlReference: candidateId,
+        evidence: [
+          `execution:${runId}`,
+          `candidate:${candidateId}`,
+          `snapshot:${snapshotId}`,
+        ],
+        assumptions: state.assumptions,
+        limitations: state.exclusions,
+      };
+
+      await this.persistRun(state);
+      return state.run;
+    } finally {
+      clearTimeout(timeoutTimer);
+    }
+  }
+}

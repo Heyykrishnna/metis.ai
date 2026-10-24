@@ -8,6 +8,10 @@ import { provisionFixtureReader, resetAnalytics } from "../scripts/fixtures.js";
 import { buildApp } from "../src/app.js";
 import { verifyMetadataSchema } from "../src/db/verify.js";
 import { createMetadataDb } from "../src/db/index.js";
+import { getDefaultSecretStore } from "../src/security/secrets.js";
+import { PostgresAnalyticalAdapter } from "../src/sql/adapter.js";
+import { AnalysisOrchestrator } from "../src/analysis/orchestrator.js";
+import { OllamaInferenceClient } from "../src/inference/client.js";
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 if (!databaseUrl)
@@ -213,6 +217,148 @@ describe("disposable PostgreSQL foundation", () => {
     try {
       const response = await app.inject({ method: "GET", url: "/health" });
       expect(response.statusCode).toBe(200);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("executes safe end-to-end analysis on real PostgreSQL database and persists run state", async () => {
+    const readerUrl = new URL(databaseUrl);
+    readerUrl.username = readerName;
+    readerUrl.password = readerPassword;
+
+    const secretStore = getDefaultSecretStore();
+    await secretStore.set("secret://fixture/reader", readerPassword);
+    await client.unsafe(
+      `GRANT USAGE ON SCHEMA analytics_clean, analytics_dirty, analytics_heldout TO "${readerName}"`,
+    );
+    await client.unsafe(
+      `GRANT SELECT ON ALL TABLES IN SCHEMA analytics_clean, analytics_dirty, analytics_heldout TO "${readerName}"`,
+    );
+
+    const wsId = "10000000-0000-4000-8000-000000000009";
+    await client`INSERT INTO workspaces (id, "ownerSubject", name) VALUES (${wsId}, 'owner-test', 'Test WS') ON CONFLICT DO NOTHING`;
+    await client`INSERT INTO memberships ("workspaceId", subject, role) VALUES (${wsId}, 'user-test', 'owner') ON CONFLICT DO NOTHING`;
+
+    const adapter = new PostgresAnalyticalAdapter({
+      connectionString: readerUrl.href,
+      poolSize: 2,
+    });
+
+    const orchestrator = new AnalysisOrchestrator({
+      adapter,
+      inference: new OllamaInferenceClient(),
+      metadataDb: db,
+    });
+
+    const app = await buildApp({
+      databaseUrl,
+      adapter,
+      orchestrator,
+    });
+
+    const token = `user-test:${wsId}`;
+    const authHeaders = { authorization: `Bearer ${token}` };
+
+    try {
+      const testRes = await app.inject({
+        method: "POST",
+        url: "/v1/connections/test",
+        headers: authHeaders,
+        payload: {
+          name: "Real Fixture Reader",
+          engine: "PostgreSQL",
+          host: readerUrl.hostname,
+          port: Number(readerUrl.port),
+          database: readerUrl.pathname.slice(1),
+          username: readerName,
+          secretReference: "secret://fixture/reader",
+          allowedSchemas: ["analytics_clean"],
+        },
+      });
+      expect(testRes.statusCode).toBe(200);
+      expect(testRes.json()).toEqual({ status: "ready", readOnly: true });
+
+      const createConnRes = await app.inject({
+        method: "POST",
+        url: "/v1/connections",
+        headers: authHeaders,
+        payload: {
+          name: "Real Fixture Reader",
+          engine: "PostgreSQL",
+          host: readerUrl.hostname,
+          port: Number(readerUrl.port),
+          database: readerUrl.pathname.slice(1),
+          username: readerName,
+          secretReference: "secret://fixture/reader",
+          allowedSchemas: ["analytics_clean"],
+        },
+      });
+      expect(createConnRes.statusCode).toBe(201);
+      const connId = createConnRes.json().id;
+
+      const submitRes = await app.inject({
+        method: "POST",
+        url: "/v1/analyses",
+        headers: authHeaders,
+        payload: {
+          connectionId: connId,
+          question:
+            "Which schools had lower enrolment in calendar 2025 than calendar 2024?",
+        },
+      });
+      expect(submitRes.statusCode).toBe(202);
+      const run = submitRes.json();
+      expect(run.status).toBe("answered");
+
+      const resultRes = await app.inject({
+        method: "GET",
+        url: `/v1/runs/${run.runId}/result`,
+        headers: authHeaders,
+      });
+      expect(resultRes.statusCode).toBe(200);
+      const result = resultRes.json();
+      expect(result.answer.status).toBe("answered");
+      expect(result.rows).toEqual([
+        { school_id: 1, delta: -20 },
+        { school_id: 4, delta: -10 },
+      ]);
+
+      const evidenceRes = await app.inject({
+        method: "GET",
+        url: `/v1/runs/${run.runId}/evidence`,
+        headers: authHeaders,
+      });
+      expect(evidenceRes.statusCode).toBe(200);
+      const evidence = evidenceRes.json();
+      expect(evidence.finalStatus).toBe("answered");
+
+      const runsInDb =
+        await client`SELECT count(*)::int AS cnt FROM analysis_runs WHERE id = ${run.runId}`;
+      expect(runsInDb[0]?.cnt).toBe(1);
+
+      const auditInDb =
+        await client`SELECT count(*)::int AS cnt FROM audit_events WHERE "runId" = ${run.runId}`;
+      expect(auditInDb[0]?.cnt).toBeGreaterThan(0);
+    } finally {
+      await app.close();
+      await adapter.close();
+    }
+  });
+
+  it("enforces cross-workspace run isolation on real database", async () => {
+    const ws2 = "10000000-0000-4000-8000-000000000019";
+    await client`INSERT INTO workspaces (id, "ownerSubject", name) VALUES (${ws2}, 'owner-other', 'Other WS') ON CONFLICT DO NOTHING`;
+    await client`INSERT INTO memberships ("workspaceId", subject, role) VALUES (${ws2}, 'user-other', 'owner') ON CONFLICT DO NOTHING`;
+
+    const app = await buildApp(databaseUrl);
+    try {
+      const isolationRes = await app.inject({
+        method: "GET",
+        url: "/v1/runs/00000000-0000-4000-8000-000000000099",
+        headers: { authorization: `Bearer user-other:${ws2}` },
+      });
+      expect(isolationRes.statusCode).toBe(404);
     } finally {
       await app.close();
     }
