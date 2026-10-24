@@ -221,9 +221,11 @@ describe("inference client", () => {
       const originalHf = process.env.HF_TOKEN;
       const originalNv = process.env.NVIDIA_API_KEY;
       const originalProv = process.env.INFERENCE_PROVIDER;
+      const originalUrl = process.env.INFERENCE_BASE_URL;
       delete process.env.HF_TOKEN;
       delete process.env.NVIDIA_API_KEY;
       delete process.env.INFERENCE_PROVIDER;
+      delete process.env.INFERENCE_BASE_URL;
       try {
         const client = createInferenceClient();
         expect(client).toBeInstanceOf(OllamaInferenceClient);
@@ -232,6 +234,8 @@ describe("inference client", () => {
         if (originalNv !== undefined) process.env.NVIDIA_API_KEY = originalNv;
         if (originalProv !== undefined)
           process.env.INFERENCE_PROVIDER = originalProv;
+        if (originalUrl !== undefined)
+          process.env.INFERENCE_BASE_URL = originalUrl;
       }
     });
   });
