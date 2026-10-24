@@ -25,6 +25,7 @@ import {
   saveSchemaMapping,
 } from "../analysis/drift.js";
 import { getRecipesForConnection } from "./recipes.js";
+import type { MetadataDatabase } from "../db/index.js";
 import { connections } from "../db/schema.js";
 import { requireAuth } from "../security/auth.js";
 import { validateDestination } from "../security/destinations.js";
@@ -59,6 +60,48 @@ export function setMemoryConnection(
   connection: Connection & { workspaceId: string },
 ): void {
   memoryConnections.set(connection.id, connection);
+}
+
+export async function resolveConnection(
+  id: string,
+  workspaceId: string,
+  metadataDb?: MetadataDatabase | null,
+): Promise<Connection | undefined> {
+  const conn = memoryConnections.get(id);
+  if (conn && conn.workspaceId === workspaceId) {
+    return {
+      id: conn.id,
+      name: conn.name,
+      engine: conn.engine,
+      allowedSchemas: conn.allowedSchemas,
+      status: conn.status,
+    };
+  }
+  if (metadataDb) {
+    try {
+      const rows = await metadataDb
+        .select()
+        .from(connections)
+        .where(
+          and(eq(connections.id, id), eq(connections.workspaceId, workspaceId)),
+        );
+      const r = rows[0];
+      if (r) {
+        const dbConn: Connection = {
+          id: r.id,
+          name: r.name,
+          engine: "PostgreSQL" as const,
+          allowedSchemas: r.allowedSchemas,
+          status: r.status,
+        };
+        memoryConnections.set(id, { ...dbConn, workspaceId });
+        return dbConn;
+      }
+    } catch {
+      return undefined;
+    }
+  }
+  return undefined;
 }
 
 export const connectionRoutes: FastifyPluginAsyncTypebox = async (app) => {
@@ -429,7 +472,11 @@ export const connectionRoutes: FastifyPluginAsyncTypebox = async (app) => {
         "00000000-0000-4000-8000-000000000001";
       const requestId = request.id ?? "req-unknown";
 
-      const conn = getMemoryConnection(connectionId, workspaceId);
+      const conn = await resolveConnection(
+        connectionId,
+        workspaceId,
+        app.metadataDb,
+      );
       if (!conn || conn.status === "revoked") {
         return reply.status(404).send({
           code: "not_found",
@@ -447,14 +494,20 @@ export const connectionRoutes: FastifyPluginAsyncTypebox = async (app) => {
           discovered,
         );
         return reply.send(constellation);
-      } catch (err) {
-        return reply.status(404).send({
-          code: "not_found",
-          message:
-            err instanceof Error
-              ? err.message
-              : "Failed to generate constellation",
-          requestId,
+      } catch {
+        const baseline = app.orchestrator.getBaselineSchema(connectionId);
+        if (baseline) {
+          return reply.send(
+            generateSchemaConstellation(connectionId, randomUUID(), baseline),
+          );
+        }
+        return reply.send({
+          connectionId,
+          snapshotId: randomUUID(),
+          schemaHash: "",
+          nodes: [],
+          edges: [],
+          generatedAt: new Date().toISOString(),
         });
       }
     },
@@ -483,7 +536,11 @@ export const connectionRoutes: FastifyPluginAsyncTypebox = async (app) => {
         "00000000-0000-4000-8000-000000000001";
       const requestId = request.id ?? "req-unknown";
 
-      const conn = getMemoryConnection(connectionId, workspaceId);
+      const conn = await resolveConnection(
+        connectionId,
+        workspaceId,
+        app.metadataDb,
+      );
       if (!conn || conn.status === "revoked") {
         return reply.status(404).send({
           code: "not_found",
@@ -538,7 +595,11 @@ export const connectionRoutes: FastifyPluginAsyncTypebox = async (app) => {
         "00000000-0000-4000-8000-000000000001";
       const requestId = request.id ?? "req-unknown";
 
-      const conn = getMemoryConnection(connectionId, workspaceId);
+      const conn = await resolveConnection(
+        connectionId,
+        workspaceId,
+        app.metadataDb,
+      );
       if (!conn || conn.status === "revoked") {
         return reply.status(404).send({
           code: "not_found",
@@ -608,7 +669,11 @@ export const connectionRoutes: FastifyPluginAsyncTypebox = async (app) => {
         });
       }
 
-      const conn = getMemoryConnection(connectionId, workspaceId);
+      const conn = await resolveConnection(
+        connectionId,
+        workspaceId,
+        app.metadataDb,
+      );
       if (!conn || conn.status === "revoked") {
         return reply.status(404).send({
           code: "not_found",
@@ -649,7 +714,11 @@ export const connectionRoutes: FastifyPluginAsyncTypebox = async (app) => {
         "00000000-0000-4000-8000-000000000001";
       const requestId = request.id ?? "req-unknown";
 
-      const conn = getMemoryConnection(connectionId, workspaceId);
+      const conn = await resolveConnection(
+        connectionId,
+        workspaceId,
+        app.metadataDb,
+      );
       if (!conn || conn.status === "revoked") {
         return reply.status(404).send({
           code: "not_found",
@@ -700,7 +769,11 @@ export const connectionRoutes: FastifyPluginAsyncTypebox = async (app) => {
         });
       }
 
-      const conn = getMemoryConnection(connectionId, workspaceId);
+      const conn = await resolveConnection(
+        connectionId,
+        workspaceId,
+        app.metadataDb,
+      );
       if (!conn || conn.status === "revoked") {
         return reply.status(404).send({
           code: "not_found",
