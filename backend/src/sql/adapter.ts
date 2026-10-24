@@ -213,13 +213,39 @@ export class PostgresAnalyticalAdapter implements ConnectorAdapter {
       foundationPolicy.limits.resultRows,
     );
 
-    const pending = this.client.unsafe(
-      queryInput.sql,
-      (queryInput.params as never[]) ?? [],
-    );
+    const ctx = queryInput.context;
+    let pendingPromise: Promise<postgres.RowList<postgres.Row[]>>;
+    let cancelFn: (() => void) | null = null;
+
+    if (ctx) {
+      pendingPromise = this.client.begin(async (sqlTx) => {
+        if (ctx.role) {
+          await sqlTx`SELECT set_config('app.current_user_role', ${ctx.role}, true)`;
+        }
+        if (ctx.workspaceId) {
+          await sqlTx`SELECT set_config('app.current_workspace_id', ${ctx.workspaceId}, true)`;
+        }
+        if (ctx.region) {
+          await sqlTx`SELECT set_config('app.current_user_region', ${ctx.region}, true)`;
+        }
+        const pending = sqlTx.unsafe(
+          queryInput.sql,
+          (queryInput.params as never[]) ?? [],
+        );
+        cancelFn = () => pending.cancel();
+        return pending;
+      });
+    } else {
+      const pending = this.client.unsafe(
+        queryInput.sql,
+        (queryInput.params as never[]) ?? [],
+      );
+      cancelFn = () => pending.cancel();
+      pendingPromise = pending;
+    }
 
     const abortHandler = () => {
-      pending.cancel();
+      if (cancelFn) cancelFn();
     };
 
     if (signal !== undefined) {
@@ -227,7 +253,7 @@ export class PostgresAnalyticalAdapter implements ConnectorAdapter {
     }
 
     try {
-      const rows = await pending;
+      const rows = await pendingPromise;
       const columns =
         rows.columns !== undefined ? rows.columns.map((col) => col.name) : [];
       const sliced = rows.slice(0, rowCap);

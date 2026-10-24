@@ -25,12 +25,18 @@ export function parseBearerToken(header?: string): string | null {
 export function parseTokenPayload(token: string): {
   subject: string;
   workspaceId?: string;
+  role?: "owner" | "analyst" | "viewer";
 } {
   if (token.includes(":")) {
     const parts = token.split(":");
     const sub = parts[0] ?? "test-subject";
     const ws = parts[1];
-    return { subject: sub, workspaceId: ws };
+    const rolePart = parts[2];
+    const role =
+      rolePart === "analyst" || rolePart === "viewer" || rolePart === "owner"
+        ? rolePart
+        : undefined;
+    return { subject: sub, workspaceId: ws, role };
   }
   return { subject: token };
 }
@@ -51,7 +57,11 @@ export async function requireAuth(
     return;
   }
 
-  const { subject, workspaceId: tokenWorkspaceId } = parseTokenPayload(token);
+  const {
+    subject,
+    workspaceId: tokenWorkspaceId,
+    role: tokenRole,
+  } = parseTokenPayload(token);
   const requestedWorkspaceId =
     (request.headers["x-workspace-id"] as string | undefined) ??
     tokenWorkspaceId;
@@ -62,7 +72,7 @@ export async function requireAuth(
       subject,
       workspaceId:
         requestedWorkspaceId ?? "00000000-0000-4000-8000-000000000001",
-      role: "owner",
+      role: tokenRole ?? "owner",
     };
     return;
   }
