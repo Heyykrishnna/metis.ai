@@ -160,6 +160,7 @@ export function operationLabel(operation: string) {
     average: "Average",
     minimum: "Minimum",
     maximum: "Maximum",
+    skewness: "Skewness",
     rows: "Matching records",
     clarify: "Clarification",
   };
