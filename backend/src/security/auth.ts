@@ -86,6 +86,32 @@ export async function requireAuth(
         .where(eq(memberships.subject, subject));
 
       if (allMemberships.length === 0) {
+        if (requestedWorkspaceId === "00000000-0000-4000-8000-000000000001") {
+          await db
+            .insert(workspaces)
+            .values({
+              id: requestedWorkspaceId,
+              ownerSubject: subject,
+              name: "Personal Workspace",
+            })
+            .onConflictDoNothing();
+          await db
+            .insert(memberships)
+            .values({
+              workspaceId: requestedWorkspaceId,
+              subject,
+              role: "owner",
+            })
+            .onConflictDoNothing();
+
+          request.authContext = {
+            subject,
+            workspaceId: requestedWorkspaceId,
+            role: "owner",
+          };
+          return;
+        }
+
         await reply.status(401).send({
           code: "unauthorized",
           message: "Subject has no workspace access",
@@ -117,8 +143,21 @@ export async function requireAuth(
 
   const mem = userMemberships[0];
   if (!mem) {
-    const existingWorkspaces = await db.select().from(workspaces).limit(1);
-    const defaultWs = existingWorkspaces[0];
+    let existingWorkspaces = await db.select().from(workspaces).limit(1);
+    let defaultWs = existingWorkspaces[0];
+    if (!defaultWs) {
+      const defaultId = "00000000-0000-4000-8000-000000000001";
+      await db
+        .insert(workspaces)
+        .values({
+          id: defaultId,
+          ownerSubject: subject,
+          name: "Personal Workspace",
+        })
+        .onConflictDoNothing();
+      existingWorkspaces = await db.select().from(workspaces).limit(1);
+      defaultWs = existingWorkspaces[0];
+    }
     if (defaultWs) {
       await db
         .insert(memberships)

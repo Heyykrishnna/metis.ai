@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import type { LocalDocument } from "@/lib/local-files";
 import { templates, type Question } from "@/lib/workspace";
 import { Icon } from "./icon";
@@ -166,10 +167,26 @@ export function HomeView({
             <span className="footer-wordmark">
               <Icon name="sparkles" size={13} /> Thoughtful analysis, by Metis.
             </span>
-            <button onClick={() => navigate("Help & getting started")}>
-              A quick tour
-              <Icon name="arrow" size={13} />
-            </button>
+            <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
+              <Link
+                href="/privacy"
+                style={{ color: "#6c765e", textDecoration: "none" }}
+              >
+                Privacy Policy
+              </Link>
+              <span style={{ color: "#c1c8ba" }}>·</span>
+              <Link
+                href="/terms"
+                style={{ color: "#6c765e", textDecoration: "none" }}
+              >
+                Terms of Service
+              </Link>
+              <span style={{ color: "#c1c8ba" }}>·</span>
+              <button onClick={() => navigate("Help & getting started")}>
+                A quick tour
+                <Icon name="arrow" size={13} />
+              </button>
+            </div>
           </div>
         </div>
       ) : (
