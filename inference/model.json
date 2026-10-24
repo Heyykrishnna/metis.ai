@@ -1,22 +1,19 @@
 {
   "version": "1.0.0",
-  "checkpoint": "Qwen/Qwen2.5-Coder-7B-Instruct",
-  "upstreamRevision": "c03e6d358207e414f1eca0bb1891e29f1db0e242",
-  "parameterCount": 7615616512,
-  "license": "Apache-2.0",
-  "runtime": "Ollama",
-  "model": "qwen2.5-coder:7b-instruct-q4_K_M",
-  "artifactDigest": "sha256:dae161e27b0e90dd1856c8bb3209201fd6736d8eb66298e75ed87571486f4364",
-  "quantization": "Q4_K_M",
-  "baseUrl": "http://127.0.0.1:11434",
-  "options": { "temperature": 0, "num_ctx": 8192, "num_predict": 1024 },
-  "dataBoundary": "local-only",
-  "hardwareReadiness": "not-tested",
-  "verifiedMetadataDate": "2026-10-24",
+  "checkpoint": "nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-BF16",
+  "name": "NVIDIA: Nemotron 3.5 Lightning",
+  "architecture": "Mamba-2 + Transformer MoE Hybrid",
+  "parameterCount": 30000000000,
+  "activeParameterCount": 3000000000,
+  "contextWindow": 1000000,
+  "license": "OpenMDW-1.1",
+  "provider": "huggingface",
+  "model": "nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-BF16",
+  "baseUrl": "https://router.huggingface.co/v1",
+  "options": { "temperature": 0, "max_tokens": 1024 },
+  "verifiedMetadataDate": "2026-10-25",
   "sources": [
-    "https://huggingface.co/api/models/Qwen/Qwen2.5-Coder-7B-Instruct",
-    "https://huggingface.co/Qwen/Qwen2.5-Coder-7B-Instruct",
-    "https://registry.ollama.ai/v2/library/qwen2.5-coder/manifests/7b-instruct-q4_K_M",
-    "https://docs.ollama.com/capabilities/structured-outputs"
+    "https://huggingface.co/nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-BF16",
+    "https://huggingface.co/docs/inference-endpoints/index"
   ]
 }

@@ -5,7 +5,9 @@ import {
   InferenceDependencyError,
   InferenceTimeoutError,
   MalformedModelOutputError,
+  NemotronInferenceClient,
   OllamaInferenceClient,
+  createInferenceClient,
 } from "../src/inference/client.js";
 
 describe("inference client", () => {
@@ -104,5 +106,137 @@ describe("inference client", () => {
     await expect(
       client.generateStructured("test prompt", TestSchema, { timeoutMs: 20 }),
     ).rejects.toBeInstanceOf(InferenceTimeoutError);
+  });
+
+  describe("NemotronInferenceClient", () => {
+    it("parses structured JSON from chat completions response", async () => {
+      const mockFetch = async () =>
+        new Response(
+          JSON.stringify({
+            choices: [
+              {
+                message: {
+                  content: JSON.stringify({
+                    answer: "nemotron answer",
+                    confidence: 0.99,
+                  }),
+                },
+              },
+            ],
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+
+      const client = new NemotronInferenceClient({
+        apiKey: "hf_test_token",
+        fetcher: mockFetch as unknown as typeof fetch,
+      });
+
+      const result = await client.generateStructured("test prompt", TestSchema);
+      expect(result).toEqual({ answer: "nemotron answer", confidence: 0.99 });
+      expect(client.modelVersion).toBe(
+        "nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-BF16",
+      );
+    });
+
+    it("extracts JSON even when wrapped in markdown code blocks", async () => {
+      const mockFetch = async () =>
+        new Response(
+          JSON.stringify({
+            choices: [
+              {
+                message: {
+                  content:
+                    '```json\n{"answer": "fenced answer", "confidence": 0.88}\n```',
+                },
+              },
+            ],
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+
+      const client = new NemotronInferenceClient({
+        apiKey: "hf_test_token",
+        fetcher: mockFetch as unknown as typeof fetch,
+      });
+
+      const result = await client.generateStructured("test prompt", TestSchema);
+      expect(result).toEqual({ answer: "fenced answer", confidence: 0.88 });
+    });
+
+    it("rejects non-JSON output with MalformedModelOutputError", async () => {
+      const mockFetch = async () =>
+        new Response(
+          JSON.stringify({
+            choices: [
+              {
+                message: {
+                  content: "I cannot produce JSON for this request.",
+                },
+              },
+            ],
+          }),
+          { status: 200 },
+        );
+
+      const client = new NemotronInferenceClient({
+        apiKey: "hf_test_token",
+        fetcher: mockFetch as unknown as typeof fetch,
+      });
+
+      await expect(
+        client.generateStructured("test prompt", TestSchema),
+      ).rejects.toBeInstanceOf(MalformedModelOutputError);
+    });
+
+    it("handles service errors with InferenceDependencyError", async () => {
+      const mockFetch = async () =>
+        new Response("Service Unavailable", { status: 503 });
+
+      const client = new NemotronInferenceClient({
+        apiKey: "hf_test_token",
+        fetcher: mockFetch as unknown as typeof fetch,
+      });
+
+      await expect(
+        client.generateStructured("test prompt", TestSchema),
+      ).rejects.toBeInstanceOf(InferenceDependencyError);
+    });
+  });
+
+  describe("createInferenceClient", () => {
+    it("returns NemotronInferenceClient when HF_TOKEN is present", () => {
+      const original = process.env.HF_TOKEN;
+      process.env.HF_TOKEN = "hf_dummy_token";
+      try {
+        const client = createInferenceClient();
+        expect(client).toBeInstanceOf(NemotronInferenceClient);
+      } finally {
+        if (original === undefined) delete process.env.HF_TOKEN;
+        else process.env.HF_TOKEN = original;
+      }
+    });
+
+    it("returns OllamaInferenceClient when no cloud credentials are provided", () => {
+      const originalHf = process.env.HF_TOKEN;
+      const originalNv = process.env.NVIDIA_API_KEY;
+      const originalProv = process.env.INFERENCE_PROVIDER;
+      const originalUrl = process.env.INFERENCE_BASE_URL;
+      delete process.env.HF_TOKEN;
+      delete process.env.NVIDIA_API_KEY;
+      delete process.env.INFERENCE_PROVIDER;
+      delete process.env.INFERENCE_BASE_URL;
+      try {
+        const client = createInferenceClient();
+        expect(client).toBeInstanceOf(OllamaInferenceClient);
+      } finally {
+        if (originalHf !== undefined) process.env.HF_TOKEN = originalHf;
+        if (originalNv !== undefined) process.env.NVIDIA_API_KEY = originalNv;
+        if (originalProv !== undefined)
+          process.env.INFERENCE_PROVIDER = originalProv;
+        if (originalUrl !== undefined)
+          process.env.INFERENCE_BASE_URL = originalUrl;
+      }
+    });
   });
 });

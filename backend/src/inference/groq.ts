@@ -1,3 +1,5 @@
+import "dotenv/config";
+
 export type QuestionClassification = "statistical" | "algorithmic";
 
 export interface ClassificationResult {
@@ -34,29 +36,40 @@ const SCHEMA_PATTERN =
   /\b(?:tables?,?\s+columns?,?\s+and\s+relationships?|tables?\s+and\s+columns?|columns?\s+and\s+tables?|understand\s+(?:the\s+)?tables?|help\s+me\s+understand\s+(?:the\s+)?tables?|database\s+schema|schema\s+overview|table\s+structure|data\s+structure|column\s+types|field\s+types|relationships?\s+in\s+my\s+data)\b/i;
 
 export class GroqClient {
-  private readonly apiKey: string;
-  private readonly model: string;
-  private readonly baseUrl: string;
+  private readonly explicitApiKey?: string;
+  private readonly explicitModel?: string;
+  private readonly explicitBaseUrl?: string;
   private readonly timeoutMs: number;
   private readonly fetcher: typeof fetch;
 
   constructor(options?: GroqClientOptions) {
-    this.apiKey =
-      options?.apiKey ??
-      process.env.GROQ_API_KEY ??
-      "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";
-    this.model =
-      options?.model ?? process.env.GROQ_MODEL ?? "openai/gpt-oss-120b";
-    this.baseUrl =
-      options?.baseUrl ??
-      process.env.GROQ_BASE_URL ??
-      "https://api.groq.com/openai/v1";
+    this.explicitApiKey = options?.apiKey;
+    this.explicitModel = options?.model;
+    this.explicitBaseUrl = options?.baseUrl;
     this.timeoutMs = options?.timeoutMs ?? 15000;
     this.fetcher = options?.fetcher ?? fetch;
   }
 
+  get apiKey(): string {
+    return this.explicitApiKey ?? process.env.GROQ_API_KEY ?? "";
+  }
+
   get configuredModel(): string {
-    return this.model;
+    return (
+      this.explicitModel ?? process.env.GROQ_MODEL ?? "openai/gpt-oss-120b"
+    );
+  }
+
+  get model(): string {
+    return this.configuredModel;
+  }
+
+  get baseUrl(): string {
+    return (
+      this.explicitBaseUrl ??
+      process.env.GROQ_BASE_URL ??
+      "https://api.groq.com/openai/v1"
+    );
   }
 
   isConfigured(): boolean {

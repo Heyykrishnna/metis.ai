@@ -730,8 +730,8 @@ export async function answerFile(
           answer: {
             runId: id,
             status: "answered",
-            answerText,
-            definition: statResult.definition,
+            answerText: answerText.slice(0, 4096),
+            definition: statResult.definition.slice(0, 4096),
             resultReference: id,
             sqlReference: null,
             evidence: [

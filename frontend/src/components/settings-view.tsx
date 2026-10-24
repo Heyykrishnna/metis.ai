@@ -71,8 +71,8 @@ export function SettingsView({
           <div>
             <strong>Analysis & inference</strong>
             <p>
-              Qwen2.5-Coder plans file calculations locally. Stored table
-              overviews and row counts also work without inference.
+              NVIDIA Nemotron 3.5 Lightning plans file calculations. Stored
+              table overviews and row counts also work without inference.
             </p>
           </div>
           <span className="badge">
