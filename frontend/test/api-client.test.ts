@@ -22,6 +22,11 @@ import {
   getEffectivePolicy,
   simulatePolicy,
   getRunContext,
+  getConnectionDrift,
+  getImpactPreview,
+  getConnectionMappings,
+  createSchemaMapping,
+  approveSchemaMapping,
   type ConnectionInput,
 } from "../src/lib/api-client";
 
@@ -475,4 +480,144 @@ it("supports conversation context and delta retrieval", async () => {
   expect(context.turnNumber).toBe(2);
   expect(context.delta.changeType).toBe("refinement");
   expect(context.turns).toHaveLength(2);
+});
+
+it("fetches drift diff, impact preview, and manages schema mappings", async () => {
+  const fetchMock = vi
+    .fn()
+    .mockResolvedValueOnce(
+      Response.json({
+        connectionId: "conn-1",
+        previousSchemaHash: "hash-prev",
+        currentSchemaHash: "hash-curr",
+        hasDrift: true,
+        changes: [
+          {
+            category: "renamed_table",
+            severity: "warning",
+            sourceObject: "analytics_clean.schools",
+            targetObjects: ["analytics_clean.org"],
+            affectedColumns: ["school_id"],
+            explanation: "Table renamed",
+          },
+        ],
+        detectedAt: new Date().toISOString(),
+      }),
+    )
+    .mockResolvedValueOnce(
+      Response.json({
+        connectionId: "conn-1",
+        drift: {
+          connectionId: "conn-1",
+          previousSchemaHash: "hash-prev",
+          currentSchemaHash: "hash-curr",
+          hasDrift: true,
+          changes: [],
+          detectedAt: new Date().toISOString(),
+        },
+        affectedRecipes: [
+          {
+            recipeId: "rec-1",
+            name: "School trends",
+            status: "needs_update",
+            staleObjects: ["analytics_clean.schools"],
+            proposedUpdate: "Map to analytics_clean.org",
+          },
+        ],
+        affectedContexts: [],
+        recommendedActions: ["Approve pending schema mappings"],
+      }),
+    )
+    .mockResolvedValueOnce(
+      Response.json([
+        {
+          id: "map-1",
+          connectionId: "conn-1",
+          sourceTable: "analytics_clean.schools",
+          targetTables: ["analytics_clean.org"],
+          mappingType: "rename",
+          columnRules: [
+            {
+              sourceColumn: "school_id",
+              targetTable: "analytics_clean.org",
+              targetColumn: "k",
+            },
+          ],
+          status: "proposed",
+          createdAt: new Date().toISOString(),
+        },
+      ]),
+    )
+    .mockResolvedValueOnce(
+      Response.json({
+        id: "map-2",
+        connectionId: "conn-1",
+        sourceTable: "analytics_clean.enrolments",
+        targetTables: ["analytics_clean.obs"],
+        mappingType: "rename",
+        columnRules: [
+          {
+            sourceColumn: "school_id",
+            targetTable: "analytics_clean.obs",
+            targetColumn: "org_k",
+          },
+        ],
+        status: "proposed",
+        createdAt: new Date().toISOString(),
+      }),
+    )
+    .mockResolvedValueOnce(
+      Response.json({
+        id: "map-2",
+        connectionId: "conn-1",
+        sourceTable: "analytics_clean.enrolments",
+        targetTables: ["analytics_clean.obs"],
+        mappingType: "rename",
+        columnRules: [
+          {
+            sourceColumn: "school_id",
+            targetTable: "analytics_clean.obs",
+            targetColumn: "org_k",
+          },
+        ],
+        status: "approved",
+        reviewedBy: "steward",
+        reviewedAt: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+      }),
+    );
+
+  vi.stubGlobal("fetch", fetchMock);
+
+  const drift = await getConnectionDrift("conn-1");
+  expect(drift.hasDrift).toBe(true);
+  expect(drift.changes).toHaveLength(1);
+  expect(drift.changes[0].category).toBe("renamed_table");
+
+  const impact = await getImpactPreview("conn-1");
+  expect(impact.affectedRecipes).toHaveLength(1);
+  expect(impact.recommendedActions).toHaveLength(1);
+
+  const mappings = await getConnectionMappings("conn-1");
+  expect(mappings).toHaveLength(1);
+  expect(mappings[0].id).toBe("map-1");
+
+  const created = await createSchemaMapping("conn-1", {
+    sourceTable: "analytics_clean.enrolments",
+    targetTables: ["analytics_clean.obs"],
+    mappingType: "rename",
+    columnRules: [
+      {
+        sourceColumn: "school_id",
+        targetTable: "analytics_clean.obs",
+        targetColumn: "org_k",
+      },
+    ],
+  });
+  expect(created.id).toBe("map-2");
+  expect(created.status).toBe("proposed");
+
+  const approved = await approveSchemaMapping("conn-1", "map-2");
+  expect(approved.id).toBe("map-2");
+  expect(approved.status).toBe("approved");
 });

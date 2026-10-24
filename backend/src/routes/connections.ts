@@ -9,8 +9,22 @@ import {
   ConnectionTestSchema,
 } from "../contracts/connections.js";
 import { SchemaConstellationSchema } from "../contracts/features.js";
+import {
+  ImpactPreviewResponseSchema,
+  SchemaDriftDiffSchema,
+  SchemaMappingRequestSchema,
+  SchemaMappingSchema,
+} from "../contracts/drift.js";
 import { discoverSchema } from "../analysis/schema.js";
 import { generateSchemaConstellation } from "../analysis/constellation.js";
+import {
+  approveSchemaMapping,
+  detectSchemaDrift,
+  generateImpactPreview,
+  getMappingsForConnection,
+  saveSchemaMapping,
+} from "../analysis/drift.js";
+import { getRecipesForConnection } from "./recipes.js";
 import { connections } from "../db/schema.js";
 import { requireAuth } from "../security/auth.js";
 import { validateDestination } from "../security/destinations.js";
@@ -437,6 +451,271 @@ export const connectionRoutes: FastifyPluginAsyncTypebox = async (app) => {
           requestId,
         });
       }
+    },
+  );
+
+  app.get(
+    "/v1/connections/:connectionId/drift",
+    {
+      schema: {
+        params: Type.Object(
+          {
+            connectionId: IdSchema,
+          },
+          { additionalProperties: false },
+        ),
+        response: {
+          200: SchemaDriftDiffSchema,
+          404: ErrorSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const { connectionId } = request.params as { connectionId: string };
+      const workspaceId =
+        request.authContext?.workspaceId ??
+        "00000000-0000-4000-8000-000000000001";
+      const requestId = request.id ?? "req-unknown";
+
+      const conn = getMemoryConnection(connectionId, workspaceId);
+      if (!conn || conn.status === "revoked") {
+        return reply.status(404).send({
+          code: "not_found",
+          message: "Connection not found or revoked in workspace",
+          requestId,
+        });
+      }
+
+      try {
+        const adapter = app.orchestrator.getAdapter();
+        const liveSchema = await discoverSchema(adapter, conn.allowedSchemas);
+        const baseline =
+          app.orchestrator.getBaselineSchema(connectionId) ?? liveSchema;
+        const drift = detectSchemaDrift(
+          connectionId,
+          baseline,
+          liveSchema,
+          conn.allowedSchemas,
+        );
+        return reply.send(drift);
+      } catch (err) {
+        return reply.status(404).send({
+          code: "not_found",
+          message:
+            err instanceof Error ? err.message : "Failed to detect drift",
+          requestId,
+        });
+      }
+    },
+  );
+
+  app.get(
+    "/v1/connections/:connectionId/impact-preview",
+    {
+      schema: {
+        params: Type.Object(
+          {
+            connectionId: IdSchema,
+          },
+          { additionalProperties: false },
+        ),
+        response: {
+          200: ImpactPreviewResponseSchema,
+          404: ErrorSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const { connectionId } = request.params as { connectionId: string };
+      const workspaceId =
+        request.authContext?.workspaceId ??
+        "00000000-0000-4000-8000-000000000001";
+      const requestId = request.id ?? "req-unknown";
+
+      const conn = getMemoryConnection(connectionId, workspaceId);
+      if (!conn || conn.status === "revoked") {
+        return reply.status(404).send({
+          code: "not_found",
+          message: "Connection not found or revoked in workspace",
+          requestId,
+        });
+      }
+
+      try {
+        const adapter = app.orchestrator.getAdapter();
+        const liveSchema = await discoverSchema(adapter, conn.allowedSchemas);
+        const baseline =
+          app.orchestrator.getBaselineSchema(connectionId) ?? liveSchema;
+        const drift = detectSchemaDrift(
+          connectionId,
+          baseline,
+          liveSchema,
+          conn.allowedSchemas,
+        );
+        const recipes = getRecipesForConnection(connectionId);
+        const preview = generateImpactPreview(connectionId, drift, recipes, []);
+        return reply.send(preview);
+      } catch (err) {
+        return reply.status(404).send({
+          code: "not_found",
+          message:
+            err instanceof Error
+              ? err.message
+              : "Failed to generate impact preview",
+          requestId,
+        });
+      }
+    },
+  );
+
+  app.post(
+    "/v1/connections/:connectionId/mappings",
+    {
+      schema: {
+        params: Type.Object(
+          {
+            connectionId: IdSchema,
+          },
+          { additionalProperties: false },
+        ),
+        body: SchemaMappingRequestSchema,
+        response: {
+          201: SchemaMappingSchema,
+          403: ErrorSchema,
+          404: ErrorSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const { connectionId } = request.params as { connectionId: string };
+      const workspaceId =
+        request.authContext?.workspaceId ??
+        "00000000-0000-4000-8000-000000000001";
+      const role = request.authContext?.role ?? "analyst";
+      const requestId = request.id ?? "req-unknown";
+
+      if (role === "viewer") {
+        return reply.status(403).send({
+          code: "forbidden",
+          message: "Viewers are not permitted to register schema mappings",
+          requestId,
+        });
+      }
+
+      const conn = getMemoryConnection(connectionId, workspaceId);
+      if (!conn || conn.status === "revoked") {
+        return reply.status(404).send({
+          code: "not_found",
+          message: "Connection not found or revoked in workspace",
+          requestId,
+        });
+      }
+
+      const mapping = saveSchemaMapping(
+        connectionId,
+        request.body,
+        request.authContext?.subject,
+      );
+      return reply.status(201).send(mapping);
+    },
+  );
+
+  app.get(
+    "/v1/connections/:connectionId/mappings",
+    {
+      schema: {
+        params: Type.Object(
+          {
+            connectionId: IdSchema,
+          },
+          { additionalProperties: false },
+        ),
+        response: {
+          200: Type.Array(SchemaMappingSchema),
+          404: ErrorSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const { connectionId } = request.params as { connectionId: string };
+      const workspaceId =
+        request.authContext?.workspaceId ??
+        "00000000-0000-4000-8000-000000000001";
+      const requestId = request.id ?? "req-unknown";
+
+      const conn = getMemoryConnection(connectionId, workspaceId);
+      if (!conn || conn.status === "revoked") {
+        return reply.status(404).send({
+          code: "not_found",
+          message: "Connection not found or revoked in workspace",
+          requestId,
+        });
+      }
+
+      const mappings = getMappingsForConnection(connectionId);
+      return reply.send(mappings);
+    },
+  );
+
+  app.post(
+    "/v1/connections/:connectionId/mappings/:mappingId/approve",
+    {
+      schema: {
+        params: Type.Object(
+          {
+            connectionId: IdSchema,
+            mappingId: IdSchema,
+          },
+          { additionalProperties: false },
+        ),
+        response: {
+          200: SchemaMappingSchema,
+          403: ErrorSchema,
+          404: ErrorSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const { connectionId, mappingId } = request.params as {
+        connectionId: string;
+        mappingId: string;
+      };
+      const workspaceId =
+        request.authContext?.workspaceId ??
+        "00000000-0000-4000-8000-000000000001";
+      const role = request.authContext?.role ?? "analyst";
+      const requestId = request.id ?? "req-unknown";
+
+      if (role === "viewer") {
+        return reply.status(403).send({
+          code: "forbidden",
+          message: "Viewers are not permitted to approve schema mappings",
+          requestId,
+        });
+      }
+
+      const conn = getMemoryConnection(connectionId, workspaceId);
+      if (!conn || conn.status === "revoked") {
+        return reply.status(404).send({
+          code: "not_found",
+          message: "Connection not found or revoked in workspace",
+          requestId,
+        });
+      }
+
+      const approved = approveSchemaMapping(
+        connectionId,
+        mappingId,
+        request.authContext?.subject ?? "admin",
+      );
+      if (!approved) {
+        return reply.status(404).send({
+          code: "not_found",
+          message: "Mapping not found",
+          requestId,
+        });
+      }
+      return reply.send(approved);
     },
   );
 };
