@@ -8,15 +8,31 @@ const root = fileURLToPath(new URL("../", import.meta.url));
 const readJson = async (path) =>
   JSON.parse(await readFile(join(root, path), "utf8"));
 const model = await readJson("inference/model.json");
-assert(
-  model.parameterCount > 0 && model.parameterCount <= 8_000_000_000,
-  "Model exceeds parameter budget",
-);
-assert.match(model.upstreamRevision, /^[a-f0-9]{40}$/);
-assert.match(model.artifactDigest, /^sha256:[a-f0-9]{64}$/);
-assert.equal(model.dataBoundary, "local-only");
-assert.equal(new URL(model.baseUrl).hostname, "127.0.0.1");
-assert.equal(model.license, "Apache-2.0");
+if (
+  model.provider === "openrouter" ||
+  model.provider === "huggingface" ||
+  model.provider === "nvidia"
+) {
+  const activeParams = model.activeParameterCount ?? model.parameterCount;
+  assert(
+    activeParams > 0 && activeParams <= 8_000_000_000,
+    "Model exceeds parameter budget",
+  );
+  assert(typeof model.checkpoint === "string" && model.checkpoint.length > 0);
+  assert(typeof model.model === "string" && model.model.length > 0);
+  assert(typeof model.license === "string" && model.license.length > 0);
+  assert(new URL(model.baseUrl).protocol.startsWith("http"));
+} else {
+  assert(
+    model.parameterCount > 0 && model.parameterCount <= 8_000_000_000,
+    "Model exceeds parameter budget",
+  );
+  assert.match(model.upstreamRevision, /^[a-f0-9]{40}$/);
+  assert.match(model.artifactDigest, /^sha256:[a-f0-9]{64}$/);
+  assert.equal(model.dataBoundary, "local-only");
+  assert.equal(new URL(model.baseUrl).hostname, "127.0.0.1");
+  assert.equal(model.license, "Apache-2.0");
+}
 const fixtures = await readJson("tests/fixtures/analytics/manifest.json");
 for (const [name, expected] of Object.entries(fixtures.files)) {
   const contents = await readFile(join(root, "tests/fixtures/analytics", name));

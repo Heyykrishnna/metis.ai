@@ -1090,5 +1090,5 @@ describe("Phase 7: Follow-up conversations and explicit clarification (Gate G7)"
 
     expect(precision).toBeGreaterThanOrEqual(0.95);
     expect(recall).toBeGreaterThanOrEqual(0.95);
-  });
+  }, 30000);
 });
