@@ -20,6 +20,7 @@ import { generateQueryCostPassport } from "../analysis/passport.js";
 import { scanDirtyRadar, updateAnomalyReview } from "../analysis/radar.js";
 import { requireAuth } from "../security/auth.js";
 import { serializeToSafeCsv } from "../security/csv.js";
+import { isSubjectRevoked } from "../security/policies.js";
 import { getMemoryConnection } from "./connections.js";
 
 const runParamsSchema = {
@@ -70,6 +71,8 @@ export const analysisRoutes: FastifyPluginAsyncTypebox = async (app) => {
           allowedSchemas,
           question,
           parentRunId,
+          role: request.authContext?.role,
+          actorSubject: request.authContext?.subject,
         });
 
         return reply.status(202).send(run);
@@ -215,6 +218,7 @@ export const analysisRoutes: FastifyPluginAsyncTypebox = async (app) => {
         params: runParamsSchema,
         response: {
           200: ResultSchema,
+          403: ErrorSchema,
           404: ErrorSchema,
         },
       },
@@ -225,6 +229,17 @@ export const analysisRoutes: FastifyPluginAsyncTypebox = async (app) => {
         request.authContext?.workspaceId ??
         "00000000-0000-4000-8000-000000000001";
       const requestId = request.id ?? "req-unknown";
+
+      if (
+        request.authContext?.subject &&
+        isSubjectRevoked(request.authContext.subject)
+      ) {
+        return reply.status(403).send({
+          code: "forbidden",
+          message: "Subject authorization revoked",
+          requestId,
+        });
+      }
 
       try {
         const result = await app.orchestrator.getResult(runId, workspaceId);
@@ -284,6 +299,27 @@ export const analysisRoutes: FastifyPluginAsyncTypebox = async (app) => {
         "00000000-0000-4000-8000-000000000001";
       const requestId = request.id ?? "req-unknown";
 
+      const role = request.authContext?.role ?? "owner";
+      if (role === "viewer") {
+        return reply.status(403).send({
+          code: "forbidden",
+          message:
+            "Viewers are restricted from exporting raw analysis detail records",
+          requestId,
+        });
+      }
+
+      if (
+        request.authContext?.subject &&
+        isSubjectRevoked(request.authContext.subject)
+      ) {
+        return reply.status(403).send({
+          code: "forbidden",
+          message: "Subject authorization revoked",
+          requestId,
+        });
+      }
+
       try {
         const result = await app.orchestrator.getResult(runId, workspaceId);
         const csvContent = serializeToSafeCsv(result.columns, result.rows);
@@ -317,6 +353,26 @@ export const analysisRoutes: FastifyPluginAsyncTypebox = async (app) => {
         request.authContext?.workspaceId ??
         "00000000-0000-4000-8000-000000000001";
       const requestId = request.id ?? "req-unknown";
+
+      const role = request.authContext?.role ?? "owner";
+      if (role === "viewer") {
+        return reply.status(403).send({
+          code: "forbidden",
+          message: "Viewers are restricted from exporting SQL definitions",
+          requestId,
+        });
+      }
+
+      if (
+        request.authContext?.subject &&
+        isSubjectRevoked(request.authContext.subject)
+      ) {
+        return reply.status(403).send({
+          code: "forbidden",
+          message: "Subject authorization revoked",
+          requestId,
+        });
+      }
 
       try {
         const evidence = await app.orchestrator.getEvidence(runId, workspaceId);

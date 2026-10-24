@@ -1,11 +1,19 @@
 import type { SqlDialect } from "./ast.js";
 
+export interface AnalyticalQueryContext {
+  role?: "owner" | "analyst" | "viewer";
+  workspaceId?: string;
+  subject?: string;
+  region?: string;
+}
+
 export interface AnalyticalQuery {
   sql: string;
   params?: readonly unknown[];
   timeoutMs?: number;
   maxRows?: number;
   signal?: AbortSignal;
+  context?: AnalyticalQueryContext;
 }
 
 export interface AnalyticalResult {

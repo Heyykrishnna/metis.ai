@@ -325,6 +325,15 @@ export const recipeRoutes: FastifyPluginAsyncTypebox = async (app) => {
         });
       }
 
+      const role = request.authContext?.role ?? "owner";
+      if (role === "viewer" && recipe.approvalStatus !== "approved") {
+        return reply.status(403).send({
+          code: "forbidden",
+          message: "Viewers can only execute approved recipes",
+          requestId,
+        });
+      }
+
       const safety = validateQuerySafety(
         recipe.sqlText,
         connection.allowedSchemas,
@@ -344,6 +353,9 @@ export const recipeRoutes: FastifyPluginAsyncTypebox = async (app) => {
           allowedSchemas: connection.allowedSchemas,
           question: recipe.question,
           sqlOverride: recipe.sqlText,
+          role,
+          actorSubject: request.authContext?.subject,
+          isRecipe: true,
         });
 
         return reply.status(202).send({

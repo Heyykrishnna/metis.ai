@@ -31,6 +31,11 @@ import {
   RecipeSchema,
   SchemaConstellationSchema,
 } from "./features.js";
+import {
+  EffectivePolicySchema,
+  PolicySimulateInputSchema,
+  PolicySimulateResultSchema,
+} from "./policy.js";
 
 const apiSchemas = {
   QuestionIntent: QuestionIntentSchema,
@@ -66,6 +71,9 @@ const apiSchemas = {
     { id: IdSchema },
     { additionalProperties: false },
   ),
+  EffectivePolicy: EffectivePolicySchema,
+  PolicySimulateInput: PolicySimulateInputSchema,
+  PolicySimulateResult: PolicySimulateResultSchema,
 };
 function ref(name: keyof typeof apiSchemas) {
   return Type.Ref(`#/components/schemas/${name}`);
@@ -270,6 +278,16 @@ export const openApiDocument = {
         ref("RecipeExecuteResponse"),
         undefined,
         "202",
+      ),
+    },
+    "/v1/policies/effective": {
+      get: operation("getEffectivePolicy", ref("EffectivePolicy")),
+    },
+    "/v1/policies/simulate": {
+      post: operation(
+        "simulatePolicy",
+        ref("PolicySimulateResult"),
+        ref("PolicySimulateInput"),
       ),
     },
     "/v1/feedback": {

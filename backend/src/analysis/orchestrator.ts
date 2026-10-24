@@ -28,6 +28,11 @@ import {
 } from "../db/schema.js";
 import type { InferenceClient } from "../inference/client.js";
 import { foundationPolicy } from "../policy.js";
+import {
+  evaluatePolicyCompliance,
+  isSubjectRevoked,
+} from "../security/policies.js";
+import type { OrganizationRole } from "../contracts/policy.js";
 import type { ConnectorAdapter } from "../sql/connectors.js";
 import { validateQuerySafety } from "../sql/safety.js";
 import {
@@ -61,6 +66,10 @@ export interface AnalysisInput {
   sqlOverride?: string;
   abortSignal?: AbortSignal;
   totalTimeoutMs?: number;
+  role?: OrganizationRole;
+  actorSubject?: string;
+  isRecipe?: boolean;
+  assignedRegion?: string;
 }
 
 export interface TruthLedgerRuleCheck {
@@ -260,6 +269,14 @@ export class AnalysisOrchestrator {
       };
     }
 
+    const candidate =
+      state.run.status === "blocked_by_policy" && state.candidate
+        ? {
+            ...state.candidate,
+            sqlText: "[REDACTED BLOCKED QUERY]",
+          }
+        : state.candidate;
+
     return {
       runId: state.run.runId,
       question: state.question,
@@ -270,7 +287,7 @@ export class AnalysisOrchestrator {
       intent: state.intent,
       snapshotId: state.snapshotId,
       plan: state.plan,
-      candidate: state.candidate,
+      candidate,
       execution: state.execution,
       verification: state.verification,
     };
@@ -582,6 +599,38 @@ export class AnalysisOrchestrator {
       this.emitProgress(state, "parsing");
       if (checkAbort()) return state.run;
 
+      if (input.actorSubject && isSubjectRevoked(input.actorSubject)) {
+        this.emitProgress(state, "blocked_by_policy");
+        state.run.completedAt = new Date().toISOString();
+        state.answer = {
+          runId,
+          status: "blocked_by_policy",
+          reason: "Subject authorization revoked",
+          nextAction: "Request authorization from workspace owner",
+          assumptions: [],
+          limitations: [],
+        };
+        await this.persistRun(state);
+        return state.run;
+      }
+
+      if (input.role === "viewer" && !input.isRecipe) {
+        this.emitProgress(state, "blocked_by_policy");
+        state.run.completedAt = new Date().toISOString();
+        state.answer = {
+          runId,
+          status: "blocked_by_policy",
+          reason:
+            "Viewers are restricted to approved aggregate recipes and cannot execute arbitrary SQL",
+          nextAction:
+            "Execute an approved saved recipe or request analyst permissions",
+          assumptions: [],
+          limitations: [],
+        };
+        await this.persistRun(state);
+        return state.run;
+      }
+
       const qLower = input.question.toLowerCase();
       if (
         ((qLower.includes("01/02/2025") && qLower.includes("02/01/2025")) ||
@@ -756,6 +805,27 @@ ORDER BY current.school_id;`;
         return state.run;
       }
 
+      const role = input.role ?? "owner";
+      const policyEval = evaluatePolicyCompliance(generatedSql, role, {
+        isRecipe: input.isRecipe,
+        assignedRegion: input.assignedRegion ?? "North America",
+      });
+      if (!policyEval.allowed) {
+        this.emitProgress(state, "blocked_by_policy");
+        state.run.completedAt = new Date().toISOString();
+        state.answer = {
+          runId,
+          status: "blocked_by_policy",
+          reason: `Query rejected by organization policy: ${policyEval.reason ?? "restricted access"}`,
+          nextAction:
+            "Submit an authorized query within permitted row and column boundaries",
+          assumptions: state.assumptions,
+          limitations: [],
+        };
+        await this.persistRun(state);
+        return state.run;
+      }
+
       this.emitProgress(state, "estimating");
       if (checkAbort()) return state.run;
 
@@ -783,6 +853,12 @@ ORDER BY current.school_id;`;
           sql: generatedSql,
           signal: abortController.signal,
           timeoutMs: foundationPolicy.limits.queryTimeoutMs,
+          context: {
+            role,
+            workspaceId: input.workspaceId,
+            subject: input.actorSubject,
+            region: input.assignedRegion ?? "North America",
+          },
         });
       } catch (err) {
         if (checkAbort()) return state.run;
@@ -794,6 +870,21 @@ ORDER BY current.school_id;`;
           reason: `SQL execution failed: ${err instanceof Error ? err.message : "database error"}`,
           nextAction: "Check query syntax and constraints",
           assumptions: state.assumptions,
+          limitations: [],
+        };
+        await this.persistRun(state);
+        return state.run;
+      }
+
+      if (input.actorSubject && isSubjectRevoked(input.actorSubject)) {
+        this.emitProgress(state, "blocked_by_policy");
+        state.run.completedAt = new Date().toISOString();
+        state.answer = {
+          runId,
+          status: "blocked_by_policy",
+          reason: "Subject authorization revoked during execution",
+          nextAction: "Request authorization from workspace owner",
+          assumptions: [],
           limitations: [],
         };
         await this.persistRun(state);

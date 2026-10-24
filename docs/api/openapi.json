@@ -2054,6 +2054,182 @@
         }
       }
     },
+    "/v1/policies/effective": {
+      "get": {
+        "operationId": "getEffectivePolicy",
+        "x-implementation-status": "planned",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EffectivePolicy"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Resource limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/policies/simulate": {
+      "post": {
+        "operationId": "simulatePolicy",
+        "x-implementation-status": "planned",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PolicySimulateInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicySimulateResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Resource limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/feedback": {
       "post": {
         "operationId": "submitFeedback",
@@ -7106,6 +7282,179 @@
           "id": {
             "type": "string",
             "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          }
+        },
+        "additionalProperties": false
+      },
+      "EffectivePolicy": {
+        "type": "object",
+        "required": [
+          "role",
+          "policyVersion",
+          "permittedActions",
+          "rowBoundaryPredicate",
+          "allowedColumns",
+          "restrictedColumns",
+          "smallCohortThreshold"
+        ],
+        "properties": {
+          "role": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "owner"
+              },
+              {
+                "type": "string",
+                "const": "analyst"
+              },
+              {
+                "type": "string",
+                "const": "viewer"
+              }
+            ]
+          },
+          "policyVersion": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "permittedActions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            "maxItems": 20
+          },
+          "rowBoundaryPredicate": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "allowedColumns": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            "maxItems": 100
+          },
+          "restrictedColumns": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            "maxItems": 50
+          },
+          "smallCohortThreshold": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "additionalProperties": false
+      },
+      "PolicySimulateInput": {
+        "type": "object",
+        "required": [
+          "targetRole",
+          "sql"
+        ],
+        "properties": {
+          "targetRole": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "owner"
+              },
+              {
+                "type": "string",
+                "const": "analyst"
+              },
+              {
+                "type": "string",
+                "const": "viewer"
+              }
+            ]
+          },
+          "sql": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "connectionId": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PolicySimulateResult": {
+        "type": "object",
+        "required": [
+          "allowed",
+          "targetRole",
+          "evaluatedPolicyVersion",
+          "rowBoundaryPredicate",
+          "violations",
+          "effectiveColumns"
+        ],
+        "properties": {
+          "allowed": {
+            "type": "boolean"
+          },
+          "targetRole": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "owner"
+              },
+              {
+                "type": "string",
+                "const": "analyst"
+              },
+              {
+                "type": "string",
+                "const": "viewer"
+              }
+            ]
+          },
+          "evaluatedPolicyVersion": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "rowBoundaryPredicate": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "violations": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            "maxItems": 20
+          },
+          "effectiveColumns": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            "maxItems": 100
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
           }
         },
         "additionalProperties": false

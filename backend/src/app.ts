@@ -14,6 +14,7 @@ import { analysisRoutes } from "./routes/analyses.js";
 import { connectionRoutes } from "./routes/connections.js";
 import { feedbackRoutes } from "./routes/feedback.js";
 import { healthRoutes } from "./routes/health.js";
+import { policyRoutes } from "./routes/policies.js";
 import { recipeRoutes } from "./routes/recipes.js";
 import { PostgresAnalyticalAdapter } from "./sql/adapter.js";
 import type { ConnectorAdapter } from "./sql/connectors.js";
@@ -150,6 +151,7 @@ export async function buildApp(
   await app.register(analysisRoutes);
   await app.register(feedbackRoutes);
   await app.register(recipeRoutes);
+  await app.register(policyRoutes);
 
   return app;
 }

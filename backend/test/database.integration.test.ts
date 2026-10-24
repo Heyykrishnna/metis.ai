@@ -551,4 +551,86 @@ describe("disposable PostgreSQL foundation", () => {
       await adapter.close();
     }
   });
+
+  it("proves transactional per-user context scoping and zero leakage across pooled connections", async () => {
+    const adapter = new PostgresAnalyticalAdapter({
+      connectionString: databaseUrl,
+      poolSize: 2,
+    });
+    try {
+      const runUserA = adapter.query({
+        sql: "SELECT current_setting('app.current_user_role', true) AS role, current_setting('app.current_user_region', true) AS region",
+        context: {
+          role: "analyst",
+          workspaceId: "ws-user-a",
+          region: "North America",
+        },
+      });
+
+      const runUserB = adapter.query({
+        sql: "SELECT current_setting('app.current_user_role', true) AS role, current_setting('app.current_user_region', true) AS region",
+        context: {
+          role: "owner",
+          workspaceId: "ws-user-b",
+          region: "EMEA",
+        },
+      });
+
+      const [resA, resB] = await Promise.all([runUserA, runUserB]);
+      expect(resA.rows[0]?.role).toBe("analyst");
+      expect(resA.rows[0]?.region).toBe("North America");
+
+      expect(resB.rows[0]?.role).toBe("owner");
+      expect(resB.rows[0]?.region).toBe("EMEA");
+
+      const resUnscoped = await adapter.query({
+        sql: "SELECT current_setting('app.current_user_role', true) AS role, current_setting('app.current_user_region', true) AS region",
+      });
+      expect(resUnscoped.rows[0]?.role ?? "").toBe("");
+      expect(resUnscoped.rows[0]?.region ?? "").toBe("");
+    } finally {
+      await adapter.close();
+    }
+  });
+
+  it("verifies organization permissions and safe execution on real PostgreSQL database", async () => {
+    const adapter = new PostgresAnalyticalAdapter({
+      connectionString: databaseUrl,
+    });
+    const inference = new OllamaInferenceClient();
+    const orchestrator = new AnalysisOrchestrator({
+      adapter,
+      inference,
+      metadataDb: db,
+    });
+
+    try {
+      const analystRun = await orchestrator.executeAnalysis({
+        workspaceId: "00000000-0000-4000-8000-000000000001",
+        connectionId: "00000000-0000-4000-8000-000000000001",
+        allowedSchemas: ["analytics_clean"],
+        question: "Regional enrolment query",
+        sqlOverride:
+          "SELECT school_id, enrolled FROM analytics_clean.enrolments WHERE year = 2025 ORDER BY school_id LIMIT 5;",
+        role: "analyst",
+        actorSubject: "real-analyst",
+        assignedRegion: "North America",
+      });
+      expect(analystRun.status).toBe("answered");
+
+      const blockedRun = await orchestrator.executeAnalysis({
+        workspaceId: "00000000-0000-4000-8000-000000000001",
+        connectionId: "00000000-0000-4000-8000-000000000001",
+        allowedSchemas: ["analytics_clean"],
+        question: "Attempt to query restricted salary",
+        sqlOverride:
+          "SELECT school_id, salary FROM analytics_clean.enrolments WHERE year = 2025;",
+        role: "analyst",
+        actorSubject: "real-analyst",
+      });
+      expect(blockedRun.status).toBe("blocked_by_policy");
+    } finally {
+      await adapter.close();
+    }
+  });
 });

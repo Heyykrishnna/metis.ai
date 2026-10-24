@@ -2,7 +2,12 @@ import type { RunStatus } from "./analysis.js";
 
 const transitions: Record<RunStatus, readonly RunStatus[]> = {
   queued: ["parsing"],
-  parsing: ["retrieving", "needs_clarification", "abstained"],
+  parsing: [
+    "retrieving",
+    "needs_clarification",
+    "abstained",
+    "blocked_by_policy",
+  ],
   retrieving: ["grounding", "abstained"],
   grounding: ["planning", "abstained"],
   planning: ["generating", "needs_clarification", "abstained"],
